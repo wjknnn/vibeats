@@ -3,7 +3,7 @@ import { useSettingStore } from '@/store'
 import { useEffect, useState } from 'react'
 import { useSound } from 'use-sound'
 
-import beatmap from '@/assets/beatmap/Ado - Odo.json'
+import beatmap from '@/assets/beatmap/Ado - odo.json'
 // import beatmap from '@/assets/beatmap/Ado - odo (hard).json'
 import music from '@/assets/music/Ado - Odo.mp3'
 
