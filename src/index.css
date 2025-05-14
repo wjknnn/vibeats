@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+
+:root {
+  color: #fff;
+  background-color: #000;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+@theme {
+  --animate-falling: falling 10s linear forwards;
+  --animate-showJudge: showJudge 0.5s cubic-bezier(0.4, 0.1, 0.2, 1.24) forwards;
+
+  @keyframes falling {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(800dvh);
+    }
+  }
+
+  @keyframes showJudge {
+    0% {
+      scale: 0;
+      opacity: 0;
+    }
+    20% {
+      scale: 1;
+      opacity: 1;
+    }
+    70% {
+      scale: 1;
+      opacity: 1;
+    }
+    100% {
+      scale: 1;
+      opacity: 0;
+    }
+  }
+}
+
+.perfect-gradient-text {
+  background: linear-gradient(
+    140deg,
+    #69e3ff 21.63%,
+    #9cbbff 40.53%,
+    #ffbefe 59.09%,
+    #fffdc0 78.39%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
