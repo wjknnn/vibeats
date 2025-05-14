@@ -36,6 +36,7 @@ type JudgeResult = {
 }
 
 export default function GamePage() {
+  const [isStarted, setIsStarted] = useState(false)
   const [noteData, setNoteData] = useState<NoteData[]>([])
   const [isPress, setIsPress] = useState<boolean[]>([
     false,
@@ -55,6 +56,7 @@ export default function GamePage() {
   }
 
   const playMusic = () => {
+    if (isStarted) return
     const speedValue = 4
     const newSpeed = speedValue / 4
     setSpeed(speedValue)
@@ -78,6 +80,7 @@ export default function GamePage() {
         ])
       }, delay)
     }
+    setIsStarted(true)
   }
 
   useEffect(() => {
@@ -124,8 +127,13 @@ export default function GamePage() {
   }, [])
 
   return (
-    <div className='min-h-dvh w-full flex justify-center items-start'>
-      <button onClick={playMusic}>Click me</button>
+    <main className='min-h-dvh w-full flex justify-center items-start overflow-hidden'>
+      <button
+        onClick={playMusic}
+        className='absolute top-5 left-5 bg-zinc-950 border border-zinc-900 rounded-[8px] px-[12px] py-[4px] cursor-pointer'
+      >
+        Start
+      </button>
       <div className='w-[485px] flex justify-center h-dvh bg-zinc-950 relative border-r border-l border-zinc-800'>
         {noteData.map(({ id, order, color, height }) => (
           <Note
@@ -165,7 +173,7 @@ export default function GamePage() {
         <Line order={3} />
         <div className='absolute top-[80dvh] outline h-0 w-full left-0 outline-white' />
       </div>
-    </div>
+    </main>
   )
 }
 
