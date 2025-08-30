@@ -1,4 +1,4 @@
-import { Note } from '@/components'
+import { Note, Player } from '@/components'
 import { useSettingStore } from '@/store'
 import { useEffect, useState } from 'react'
 import { useSound } from 'use-sound'
@@ -57,16 +57,19 @@ export default function GamePage() {
 
   const playMusic = () => {
     if (isStarted) return
+    setIsStarted(true)
+
     const speedValue = 4
     const newSpeed = speedValue / 4
     setSpeed(speedValue)
+
     const viewHeight = window.innerHeight * 0.8
     setTimeout(() => play(), 1000 / newSpeed)
     for (const note of beatmap.map) {
       const [order, delay, longDelay] = note
 
       const height =
-        (longDelay > 1 ? ((longDelay - delay) / 1000) * viewHeight : 0) + 20
+        longDelay > 1 ? ((longDelay - delay) / 1000) * viewHeight : 24
 
       setTimeout(() => {
         setNoteData((prev) => [
@@ -74,13 +77,12 @@ export default function GamePage() {
           {
             id: crypto.randomUUID(),
             order,
-            color: order === 0 || order === 3 ? 'yellow' : 'blue',
+            color: order === 0 || order === 3 ? 'rgb(221, 215, 236)' : 'blue',
             height,
           },
         ])
       }, delay)
     }
-    setIsStarted(true)
   }
 
   useEffect(() => {
@@ -120,6 +122,7 @@ export default function GamePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
@@ -134,25 +137,30 @@ export default function GamePage() {
       >
         Start
       </button>
-      <div className='w-[485px] flex justify-center h-dvh bg-zinc-950 relative border-r border-l border-zinc-800'>
-        {noteData.map(({ id, order, color, height }) => (
+      <Player>
+        {noteData.map(({ id, order, height }) => (
           <Note
             key={id}
             id={id}
             order={order}
             duration={40000 / speed}
-            color={color}
             end={end}
             height={height}
           />
         ))}
-        {isPress.map((isPress, index) => (
+        {isPress.map((v, index) => (
           <div
             key={index}
-            className={`flex-1 h-full bg-gradient-to-t from-transparent via-20% to-transparent ${
-              isPress ? 'via-zinc-800' : 'via-zinc-950'
+            className={`flex-1 h-full bg-gradient-to-t from-transparent via-20% to-transparent relative ${
+              v ? 'via-[rgba(43,103,199,0.08)]' : 'via-transparent'
             }`}
-          />
+          >
+            <div
+              className={`w-full h-[40dvh] absolute left-0 bottom-[20dvh] bg-gradient-to-t to-transparent ${
+                v ? 'from-[rgba(69,178,255,0.16)]' : 'from-transparent'
+              }`}
+            />
+          </div>
         ))}
         {judgeResult && (
           <div
@@ -168,18 +176,8 @@ export default function GamePage() {
             </div>
           </div>
         )}
-        <Line order={1} />
-        <Line order={2} />
-        <Line order={3} />
-        <div className='absolute top-[80dvh] outline h-0 w-full left-0 outline-white' />
-      </div>
+        <div className='absolute top-[calc(80dvh-4px)] bg-white h-[8px] w-full left-0' />
+      </Player>
     </main>
   )
 }
-
-const Line = ({ order }: { order: number }) => (
-  <div
-    className='w-px h-full bg-zinc-900 absolute'
-    style={{ left: order * 120 }}
-  />
-)

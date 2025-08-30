@@ -1,31 +1,33 @@
-type NoteProps = {
+import { PLAYER_WIDTH } from '@/common/general'
+import { NOTE_SKIN } from '@/common/skin'
+import { useSettingStore, useCustomStore } from '@/store'
+
+export type NoteProps = {
   id: string
   order: number
   duration: number
-  color: string
   height: number
   end: (id: string) => void
 }
 
-export const Note = ({
-  id,
-  order,
-  duration,
-  color,
-  height,
-  end,
-}: NoteProps) => {
+export const Note = ({ id, order, duration, height, end }: NoteProps) => {
+  const { noteSkin } = useCustomStore()
+  const { keys } = useSettingStore()
+
+  const skin = NOTE_SKIN[noteSkin]
+  const h = height ?? skin.height
+
   return (
     <div
       style={{
         animationDuration: `${duration}ms`,
-        backgroundColor: color,
         left: order * 121,
-        height,
-        top: -height + 10,
+        height: h,
+        top: -h + 12,
+        width: PLAYER_WIDTH / keys,
       }}
       onAnimationEnd={() => end(id)}
-      className='w-[120px] rounded-md animate-falling absolute'
+      className='rounded-md animate-falling absolute'
     />
   )
 }
