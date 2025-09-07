@@ -1,10 +1,10 @@
 import { Note, Player } from '@/components'
 import { useSettingStore } from '@/store'
-import { useEffect, useState } from 'react'
-import { useSound } from 'use-sound'
+import { useEffect, useRef, useState } from 'react'
+import * as Tone from 'tone'
 
-import beatmap from '@/assets/beatmap/Ado - odo.json'
-// import beatmap from '@/assets/beatmap/Ado - odo (hard).json'
+// import beatmap from '@/assets/beatmap/Ado - odo.json'
+import beatmap from '@/assets/beatmap/Ado - odo (hard).json'
 import music from '@/assets/music/Ado - Odo.mp3'
 
 type NoteData = {
@@ -47,7 +47,7 @@ export default function GamePage() {
   const [judgeResult, setJudgeResult] = useState<JudgeResult | undefined>(
     undefined
   )
-  const [play] = useSound(music, { volume: 0.1 })
+  const playerRef = useRef<Tone.Player | null>(null)
 
   const { speed, setSpeed } = useSettingStore()
 
@@ -55,7 +55,7 @@ export default function GamePage() {
     setNoteData((prev) => prev.filter((v) => v.id !== id))
   }
 
-  const playMusic = () => {
+  const playMusic = async () => {
     if (isStarted) return
     setIsStarted(true)
 
@@ -64,7 +64,20 @@ export default function GamePage() {
     setSpeed(speedValue)
 
     const viewHeight = window.innerHeight * 0.8
-    setTimeout(() => play(), 1000 / newSpeed)
+
+    // Tone.js: 오디오 컨텍스트를 resume하고, Player를 생성하여 음악 재생
+    await Tone.start()
+    if (!playerRef.current) {
+      playerRef.current = new Tone.Player({
+        url: music,
+        volume: -20, // 대략 0.1 볼륨에 해당
+        autostart: false,
+      }).toDestination()
+    }
+    setTimeout(() => {
+      playerRef.current?.start()
+    }, 1000 / newSpeed)
+
     for (const note of beatmap.map) {
       const [order, delay, longDelay] = note
 

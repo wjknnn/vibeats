@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type Page = 'home' | 'game' | 'result'
+type Page = 'intro' | 'home' | 'game' | 'result'
 
 type CommonState = {
   page: Page
@@ -8,6 +8,6 @@ type CommonState = {
 }
 
 export const useCommonStore = create<CommonState>((set) => ({
-  page: 'home',
+  page: 'intro',
   setPage: (page: Page) => set({ page }),
 }))

@@ -17,12 +17,24 @@ body {
 @theme {
   --animate-falling: falling 10s linear forwards;
   --animate-showJudge: showJudge 0.5s cubic-bezier(0.4, 0.1, 0.2, 1.24) forwards;
+  --animate-appearBottom: appearBottom 0.3s ease-out forwards;
 
   --default-font-family-pretendard: 'Pretendard Variable', 'Pretendard',
     '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto',
     'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR',
     'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
     'sans-serif';
+
+  @keyframes appearBottom {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 
   @keyframes falling {
     from {
@@ -64,4 +76,50 @@ body {
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+@keyframes intro-slider {
+  from {
+    width: 0;
+    transform: translateX(0);
+  }
+  to {
+    width: 50vw;
+    transform: translateX(-150vw);
+  }
+}
+
+.intro-slider {
+  animation: intro-slider 1s cubic-bezier(0, 0.6, 1, 0) forwards;
+  animation-delay: 0.5s;
+}
+
+@keyframes intro-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.intro-appear {
+  animation: intro-appear 10ms linear forwards;
+  animation-delay: 1.2s;
+  opacity: 0;
+}
+
+@keyframes intro-scale-up {
+  from {
+    scale: 1;
+  }
+  to {
+    scale: 1.4;
+  }
+}
+
+.intro-scale-up {
+  animation: intro-scale-up 1s cubic-bezier(0.72, 0, 1, 0.8) forwards;
+  animation-delay: 2s;
+  scale: 1;
 }
