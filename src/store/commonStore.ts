@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type Page = 'intro' | 'home' | 'game' | 'result'
+type Page = 'intro' | 'home' | 'game' | 'result' | 'musicList'
 
 type CommonState = {
   page: Page

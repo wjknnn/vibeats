@@ -7,7 +7,10 @@ type LaneProps = {
   notes: NoteProps[]
 }
 
-export const Lane = ({ order, notes }: LaneProps) => {
+export const Lane = ({
+  //  order,
+  notes,
+}: LaneProps) => {
   const { keys } = useSettingStore()
 
   return (
