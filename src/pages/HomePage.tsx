@@ -18,7 +18,7 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    audio.addPlayer('bgm_home', '/src/assets/music/home_bgm.mp3').then(() => {
+    audio.addPlayer('bgm_home', '/music/home_bgm.mp3').then(() => {
       const player = audio.getPlayer('bgm_home')
 
       if (player) setupPlayer(player)

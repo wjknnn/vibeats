@@ -354,7 +354,7 @@ const data = {
   id: 1,
   title: 'Odo',
   artist: 'Ado',
-  url: '/src/assets/music/Ado - Odo.mp3',
+  url: '/music/Ado - Odo.mp3',
   map: '/src/assets/beatmap/Ado - odo (hard).json',
   offset: 0,
   volume: -16,

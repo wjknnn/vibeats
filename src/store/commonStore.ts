@@ -10,7 +10,7 @@ type CommonState = {
 }
 
 export const useCommonStore = create<CommonState>((set) => ({
-  page: 'musicList',
+  page: 'intro',
   setPage: (page: Page) => set({ page }),
   selectedMusicId: null,
   setSelectedMusicId: (id: number | null) => set({ selectedMusicId: id }),
