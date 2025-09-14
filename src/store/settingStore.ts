@@ -17,7 +17,7 @@ type SettingState = {
 export const useSettingStore = create<SettingState>()(
   persist(
     (set) => ({
-      speed: 1.0,
+      speed: 5.2,
       setSpeed: (speed: number) => set({ speed }),
       keys: 4,
       setKeys: (keys: number) => set({ keys }),

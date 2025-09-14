@@ -1,12 +1,21 @@
-import { useAudioManager } from '@/audio/AudioManagerContext'
-import { MainContainer } from '@/components/MainContainer'
 import { useEffect, useState, useRef } from 'react'
+import { useAudioManager } from '@/audio/AudioManagerContext'
+import { useCommonStore } from '@/store'
+import { MainContainer } from '@/components/MainContainer'
 
 export default function MusicListPage() {
   const [selected, setSelected] = useState<number>(0)
+
   const debounceRef = useRef<number | null>(null)
 
   const audio = useAudioManager()
+
+  const { setPage, setSelectedMusicId } = useCommonStore()
+
+  const playGame = () => {
+    setPage('game')
+    setSelectedMusicId(data[selected].id)
+  }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -25,12 +34,18 @@ export default function MusicListPage() {
       }
     }
 
+    const handleEnter = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') playGame()
+    }
+
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('wheel', handleWheel)
+    window.addEventListener('keydown', handleEnter)
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('wheel', handleWheel)
+      window.removeEventListener('keydown', handleEnter)
     }
   }, [data, selected])
 
@@ -95,6 +110,7 @@ export default function MusicListPage() {
           {data.map((item, index) => (
             <div
               key={index}
+              onClick={playGame}
               className={`px-4 py-2 border rounded-lg w-full cursor-pointer transition-all ${
                 selected === index
                   ? 'scale-105 border-blue-500'
