@@ -16,11 +16,11 @@ type NoteData = {
 }
 
 const Judge = {
-  PERFECT: 0,
-  GREAT: 1,
-  GOOD: 2,
-  BAD: 3,
-  MISS: 4,
+  PERFECT: 100,
+  GREAT: 95,
+  GOOD: 90,
+  BAD: 85,
+  MISS: 0,
 } as const
 
 const JudgeColor = {
@@ -73,6 +73,7 @@ export default function GamePage() {
   )
   const [combo, setCombo] = useState(0)
   const [judgeHistory, setJudgeHistory] = useState<(keyof typeof Judge)[]>([])
+  const [of, setOf] = useState<number>(0)
 
   const audio = useAudioManager()
 
@@ -90,9 +91,13 @@ export default function GamePage() {
     const player = audio.getPlayer(`song_${data.id}`)
     if (!player) return
 
+    const startDelay = (LOCAL_SPEED * 1000) / speed + data.offset
+
     setTimeout(() => {
       player.start()
-    }, (LOCAL_SPEED * 1000) / speed + data.offset)
+      setOf(player.now())
+    }, startDelay)
+    console.log('play once!')
 
     for (const note of beatmap.map) {
       const [order, delay, longDelay] = note
@@ -120,8 +125,7 @@ export default function GamePage() {
   // 노트별로 입력 타이밍과 비교하여 판정
   const handleJudge = useCallback(
     (order: number) => {
-      const now =
-        (audio.getPlayer(`song_${data.id}`)?.now() ?? 0) - LOCAL_OFFSET / 2000
+      const now = (audio.getPlayer(`song_${data.id}`)?.now() ?? 0) - of
       const candidates = noteData
         .filter((note) => note.order === order)
         .map((note) => ({
@@ -130,6 +134,7 @@ export default function GamePage() {
           offset: now * 1000 - note.time, // (+)면 느림, (-)면 빠름
         }))
         .filter(({ diff }) => diff <= JUDGE_WINDOW.BAD)
+      console.log(candidates, noteData, order, now * 1000)
       if (candidates.length === 0) return
 
       const { note, offset } = candidates.sort((a, b) => a.diff - b.diff)[0]
@@ -151,7 +156,7 @@ export default function GamePage() {
 
       end(note.id)
     },
-    [noteData, audio, data]
+    [noteData, audio, data, of]
   )
 
   useEffect(() => {
@@ -194,14 +199,22 @@ export default function GamePage() {
   }, [data, handleJudge])
 
   useEffect(() => {
-    audio.addPlayer(`song_${data.id}`, data.url, { volume: data.volume })
+    setOf(0)
+    const timer = setTimeout(() => {
+      playMusic()
+    }, 3000)
+    audio.addPlayer('song', data.id, data.url, {
+      volume: data.volume,
+      onstop: () => setIsStarted(false),
+    })
+    return () => clearTimeout(timer)
   }, [data])
 
   // MISS 판정: BAD 범위 밖으로 내려간 노트 자동 처리
   useEffect(() => {
     if (!isStarted) return
     const timer = setInterval(() => {
-      const now = audio.getPlayer(`song_${data.id}`)?.now() ?? 0
+      const now = (audio.getPlayer(`song_${data.id}`)?.now() ?? 0) - of
       setNoteData((prev) => {
         let missed = false
         const remain: NoteData[] = []
@@ -229,23 +242,14 @@ export default function GamePage() {
         }
         return remain
       })
-    }, 16)
+    }, 100)
     return () => clearInterval(timer)
-  }, [isStarted, audio, data])
+  }, [isStarted, audio, data, of])
 
   // 정확도 계산 (소수점 한자리)
-  const total = judgeHistory.filter(
-    (j) =>
-      j === 'PERFECT' ||
-      j === 'GREAT' ||
-      j === 'GOOD' ||
-      j === 'BAD' ||
-      j === 'MISS'
-  ).length
-  const correct = judgeHistory.filter(
-    (j) => j === 'PERFECT' || j === 'GREAT' || j === 'GOOD' || j === 'BAD'
-  ).length
-  const accuracy = total === 0 ? 100 : ((correct / total) * 100).toFixed(1)
+  const total = judgeHistory.length
+  const score = judgeHistory.reduce((n, v) => (n += Judge[v]), 0)
+  const accuracy = total === 0 ? 100 : (score / total).toFixed(2)
 
   // 판정 바 UI 컴포넌트
   function JudgeBar({ offset }: { offset: number }) {
@@ -277,10 +281,10 @@ export default function GamePage() {
       <div
         style={{
           position: 'absolute',
-          top: 24,
-          right: 32,
+          top: '60%',
+          right: '43%',
           zIndex: 100,
-          textAlign: 'right',
+          textAlign: 'center',
         }}
       >
         <div className='text-[32px] font-black text-sky-500 drop-shadow'>

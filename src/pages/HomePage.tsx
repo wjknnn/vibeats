@@ -1,28 +1,27 @@
+import { type Player } from 'tone'
 import { useEffect } from 'react'
-import { useCommonStore } from '@/store'
 import { useAudioManager } from '@/audio/AudioManagerContext'
+import { useCommonStore } from '@/store'
 import { MainContainer } from '@/components/MainContainer'
 
 export default function HomePage() {
   const { setPage } = useCommonStore()
   const audio = useAudioManager()
 
-  // player 세팅 함수
-  const setupPlayer = (player: any) => {
+  const setupPlayer = (player: Player) => {
     player.loop = true
     player.loopStart = 0
     player.loopEnd = 141
     player.fadeIn = 2
     player.fadeOut = 2
     player.volume.value = -20
+    player.autostart = true
   }
 
   useEffect(() => {
-    audio.addPlayer('bgm_home', '/music/home_bgm.mp3').then(() => {
+    audio.addPlayer('bgm', 'home', '/music/home_bgm.mp3').then(() => {
       const player = audio.getPlayer('bgm_home')
-
       if (player) setupPlayer(player)
-      setTimeout(() => player?.start(), 2000)
     })
   }, [])
 
@@ -31,6 +30,9 @@ export default function HomePage() {
 
   return (
     <MainContainer className='flex-col bg-white text-black'>
+      <h1 className='text-[48px] font-black mb-10 perfect-gradient-text saturate-200 contrast-75'>
+        VIBEATS
+      </h1>
       <section className='max-w-[400px] w-full flex flex-col gap-2'>
         <button className={className} onClick={() => setPage('musicList')}>
           노래 선택

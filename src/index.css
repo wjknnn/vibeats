@@ -65,7 +65,7 @@ body {
   }
 }
 
-.perfect-gradient-text {
+@utility perfect-gradient-text {
   background: linear-gradient(
     140deg,
     #69e3ff 21.63%,

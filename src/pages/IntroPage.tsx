@@ -4,6 +4,7 @@ import { useCommonStore } from '@/store'
 
 export default function IntroPage() {
   const { setPage } = useCommonStore()
+
   const audio = useAudioManager()
 
   return (
@@ -16,10 +17,7 @@ export default function IntroPage() {
           VIBEATS
         </h1>
         <button
-          onClick={() => {
-            audio.tone.start()
-            setPage('home')
-          }}
+          onClick={() => audio.tone.start().then(() => setPage('home'))}
           className='bg-neutral-800 hover:bg-neutral-700 text-[20px] text-white font-medium py-2 px-4 rounded absolute -bottom-[80px] opacity-0 animate-appearBottom [animation-delay:3.2s] cursor-pointer'
         >
           Get Started

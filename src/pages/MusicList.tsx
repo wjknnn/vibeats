@@ -54,14 +54,19 @@ export default function MusicListPage() {
       clearTimeout(debounceRef.current)
     }
 
-    const currPlayer = audio.getPlayer(`bgm_musicList${data[selected].id}`)
+    let currPlayer = audio.getPlayer(`bgm_musicList${data[selected].id}`)
     let timeout: number | null = null
     let loofStopTimeout: number | null = null
     let loofReStartTimeout: number | null = null
 
     if (currPlayer) {
     } else {
-      audio.addPlayer(`bgm_musicList${data[selected].id}`, data[selected].bgm)
+      audio
+        .addPlayer('bgm', `musicList${data[selected].id}`, data[selected].bgm)
+        .then(
+          () =>
+            (currPlayer = audio.getPlayer(`bgm_musicList${data[selected].id}`))
+        )
     }
 
     debounceRef.current = setTimeout(() => {

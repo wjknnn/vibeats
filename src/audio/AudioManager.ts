@@ -1,16 +1,17 @@
 import * as Tone from 'tone'
 
 export type PlayerOptions = Partial<Tone.PlayerOptions>
+export type PlayerType = 'bgm' | 'fx' | 'song'
 
 function applyPlayerOptions(player: Tone.Player, options?: PlayerOptions) {
   if (!options) return
   Object.entries(options).forEach(([k, v]) => {
-    if (k === 'volume' && typeof v === 'number') {
+    const key = k as keyof Omit<PlayerOptions, 'onload' | 'onerror' | 'url'>
+    if (key === 'volume' && typeof v === 'number') {
       player.volume.value = v
     } else {
       try {
-        // @ts-ignore
-        player[k] = v
+        ;(player[key] as PlayerOptions[keyof PlayerOptions]) = v
       } catch {}
     }
   })
@@ -22,10 +23,16 @@ class AudioManager {
 
   private bgmLowpass: Tone.Filter | null = null
 
-  async addPlayer(key: string, url: string, options?: PlayerOptions) {
+  async addPlayer(
+    key: PlayerType,
+    name: string | number,
+    url: string,
+    options?: PlayerOptions
+  ) {
+    const id = `${key}_${name}`
     const player = new Tone.Player(url).toDestination()
     applyPlayerOptions(player, options)
-    this.players.set(key, player)
+    this.players.set(id, player)
   }
 
   getPlayer(key: string) {
@@ -81,15 +88,8 @@ class AudioManager {
     })
   }
 
-  setVolumeByType(type: 'bgm' | 'effect' | 'song', volume: number) {
-    const keyPrefix =
-      type === 'bgm'
-        ? 'bgm_'
-        : type === 'effect'
-        ? 'fx_'
-        : type === 'song'
-        ? 'song_'
-        : ''
+  setVolumeByType(type: PlayerType, volume: number) {
+    const keyPrefix = `${type}_`
 
     // 단일 플레이어
     this.players.forEach((player, key) => {

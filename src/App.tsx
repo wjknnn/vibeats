@@ -1,3 +1,4 @@
+import { useAudioManager } from '@/audio/AudioManagerContext'
 import { useCommonStore } from '@/store'
 
 import IntroPage from '@/pages/IntroPage'
@@ -8,6 +9,11 @@ import MusicListPage from '@/pages/MusicList'
 
 function App() {
   const { page } = useCommonStore()
+  const audio = useAudioManager()
+
+  if (audio.tone.context.state === 'suspended') {
+    return <IntroPage />
+  }
 
   switch (page) {
     case 'intro':
