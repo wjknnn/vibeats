@@ -88,14 +88,14 @@ export default function GamePage() {
     setIsStarted(true)
 
     const viewHeight = window.innerHeight * 0.8
-    const player = audio.getPlayer(`song_${data.id}`)
-    if (!player) return
+    const node = audio.getPlayer(`song_${data.id}`)
+    if (!node) return
 
     const startDelay = (LOCAL_SPEED * 1000) / speed + data.offset
 
     setTimeout(() => {
-      player.start()
-      setOf(player.now())
+      node.player.start()
+      setOf(node.player.now())
     }, startDelay)
     console.log('play once!')
 
@@ -125,7 +125,7 @@ export default function GamePage() {
   // 노트별로 입력 타이밍과 비교하여 판정
   const handleJudge = useCallback(
     (order: number) => {
-      const now = (audio.getPlayer(`song_${data.id}`)?.now() ?? 0) - of
+      const now = (audio.getPlayer(`song_${data.id}`)?.player.now() ?? 0) - of
       const candidates = noteData
         .filter((note) => note.order === order)
         .map((note) => ({
@@ -214,7 +214,7 @@ export default function GamePage() {
   useEffect(() => {
     if (!isStarted) return
     const timer = setInterval(() => {
-      const now = (audio.getPlayer(`song_${data.id}`)?.now() ?? 0) - of
+      const now = (audio.getPlayer(`song_${data.id}`)?.player.now() ?? 0) - of
       setNoteData((prev) => {
         let missed = false
         const remain: NoteData[] = []

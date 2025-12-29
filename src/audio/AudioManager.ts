@@ -2,6 +2,12 @@ import * as Tone from 'tone'
 
 export type PlayerOptions = Partial<Tone.PlayerOptions>
 export type PlayerType = 'bgm' | 'fx' | 'song'
+export type ToneFFT = Tone.FFT
+
+type PlayerNode = {
+  player: Tone.Player
+  fft?: Tone.FFT
+}
 
 function applyPlayerOptions(player: Tone.Player, options?: PlayerOptions) {
   if (!options) return
@@ -18,7 +24,7 @@ function applyPlayerOptions(player: Tone.Player, options?: PlayerOptions) {
 }
 
 class AudioManager {
-  players: Map<string, Tone.Player> = new Map()
+  players: Map<string, PlayerNode> = new Map()
   pools: Map<string, Tone.Player[]> = new Map()
 
   private bgmLowpass: Tone.Filter | null = null
@@ -30,9 +36,23 @@ class AudioManager {
     options?: PlayerOptions
   ) {
     const id = `${key}_${name}`
-    const player = new Tone.Player(url).toDestination()
+    const player = new Tone.Player(url)
     applyPlayerOptions(player, options)
-    this.players.set(id, player)
+
+    let fft: Tone.FFT | undefined
+
+    if (key === 'bgm' || key === 'song') {
+      fft = new Tone.FFT({
+        size: 1024,
+        smoothing: 0,
+      })
+      player.connect(fft)
+      fft.toDestination()
+    } else {
+      player.toDestination()
+    }
+
+    this.players.set(id, { player, fft })
   }
 
   getPlayer(key: string) {
@@ -42,7 +62,7 @@ class AudioManager {
   removePlayer(key: string) {
     const player = this.players.get(key)
     if (player) {
-      player.dispose()
+      player.player.dispose()
       this.players.delete(key)
     }
   }
@@ -78,7 +98,7 @@ class AudioManager {
 
   setMusicVolume(volume: number) {
     this.players.forEach((player) => {
-      player.volume.value = volume
+      player.player.volume.value = volume
     })
     // 풀에 있는 플레이어도 모두 적용
     this.pools.forEach((pool) => {
@@ -94,7 +114,7 @@ class AudioManager {
     // 단일 플레이어
     this.players.forEach((player, key) => {
       if (key.startsWith(keyPrefix)) {
-        player.volume.value = volume
+        player.player.volume.value = volume
       }
     })
     // 풀 플레이어
@@ -130,10 +150,11 @@ class AudioManager {
         Q: 1,
       }).toDestination()
       // 모든 bgm_ 플레이어에 연결
-      this.players.forEach((player, key) => {
+      this.players.forEach((node, key) => {
         if (key.startsWith('bgm')) {
-          player.disconnect()
-          player.connect(this.bgmLowpass!)
+          node.player.disconnect()
+          node.player.connect(this.bgmLowpass!)
+          if (node.fft) node.player.connect(node.fft)
         }
       })
     }
@@ -143,7 +164,7 @@ class AudioManager {
     // 볼륨 조절
     this.players.forEach((player, key) => {
       if (key.startsWith('bgm')) {
-        player.volume.rampTo(vol, duration)
+        player.player.volume.rampTo(vol, duration)
       }
     })
   }

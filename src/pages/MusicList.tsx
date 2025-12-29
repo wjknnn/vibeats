@@ -70,9 +70,11 @@ export default function MusicListPage() {
     }
 
     debounceRef.current = setTimeout(() => {
-      let player = audio.getPlayer(`bgm_musicList${data[selected].id}`)
+      let node = audio.getPlayer(`bgm_musicList${data[selected].id}`)
 
-      if (player) {
+      if (node?.player) {
+        const { player } = node
+
         player.fadeIn = 0.5
         player.fadeOut = 2
         player.volume.value = data[selected].volume
@@ -89,7 +91,7 @@ export default function MusicListPage() {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
       }
-      if (currPlayer) currPlayer.stop()
+      if (currPlayer) currPlayer.player.stop()
       if (timeout) clearTimeout(timeout)
       if (loofStopTimeout) clearTimeout(loofStopTimeout)
       if (loofReStartTimeout) clearTimeout(loofReStartTimeout)
@@ -97,7 +99,7 @@ export default function MusicListPage() {
   }, [data, selected])
 
   useEffect(() => {
-    audio.getPlayer('bgm_home')?.stop()
+    audio.getPlayer('bgm_home')?.player.stop()
   }, [])
 
   return (

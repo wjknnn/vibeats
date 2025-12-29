@@ -1,51 +1,89 @@
-import { type Player } from 'tone'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAudioManager } from '@/audio/AudioManagerContext'
-import { useCommonStore } from '@/store'
+import { useCommonStore, type Page } from '@/store'
 import { MainContainer } from '@/components/MainContainer'
+import { PlayerBottom } from '@/components/PlayerBottom'
+import { type ToneFFT } from '@/audio/AudioManager'
 
 export default function HomePage() {
+  const [bgmFFT, setBgmFFT] = useState<ToneFFT>()
+  const [currIdx] = useState<number>(0)
+
   const { setPage } = useCommonStore()
+
   const audio = useAudioManager()
 
-  const setupPlayer = (player: Player) => {
-    player.loop = true
-    player.loopStart = 0
-    player.loopEnd = 141
-    player.fadeIn = 2
-    player.fadeOut = 2
-    player.volume.value = -20
-    player.autostart = true
-  }
+  const buttons: { name: string; page: Page }[] = [
+    {
+      name: '음악 선택',
+      page: 'musicList',
+    },
+    {
+      name: '음악 선택',
+      page: 'musicList',
+    },
+    {
+      name: '음악 선택',
+      page: 'musicList',
+    },
+    {
+      name: '음악 선택',
+      page: 'musicList',
+    },
+  ]
 
   useEffect(() => {
-    audio.addPlayer('bgm', 'home', '/music/home_bgm.mp3').then(() => {
-      const player = audio.getPlayer('bgm_home')
-      if (player) setupPlayer(player)
-    })
+    audio.createPool('fx_focus', '/audio/focus.m4a', undefined, { volume: -6 })
+    audio
+      .addPlayer('bgm', 'home', '/music/home_bgm.mp3', {
+        loop: true,
+        loopStart: 0,
+        loopEnd: 182,
+        fadeIn: 2,
+        fadeOut: 2,
+        volume: -6,
+      })
+      .then(() => {
+        const node = audio.getPlayer('bgm_home')
+        if (node) {
+          node.player.autostart = true
+          if (node.fft) setBgmFFT(node.fft)
+        }
+      })
   }, [])
-
-  const className =
-    'flex justify-center items-center w-full h-14 rounded-lg border border-neutral-200 text-[24px] font-bold hover:bg-neutral-50 cursor-pointer'
 
   return (
     <MainContainer className='flex-col bg-white text-black'>
-      <h1 className='text-[48px] font-black mb-10 perfect-gradient-text saturate-200 contrast-75'>
-        VIBEATS
-      </h1>
-      <section className='max-w-[400px] w-full flex flex-col gap-2'>
-        <button className={className} onClick={() => setPage('musicList')}>
-          노래 선택
-        </button>
-        <button className={className}>설정</button>
+      <section className='flex-1 flex flex-col justify-center items-center'>
+        <h1 className='text-[48px] font-black mb-10 perfect-gradient-text saturate-200 contrast-75'>
+          VIBEATS
+        </h1>
+        <section className='w-full flex gap-10 perspective-near'>
+          {buttons.map((v, i) => (
+            <button
+              key={i}
+              className={`border border-zinc-200 min-w-[40dvw] h-[320px] rounded-[20px] bg-white/20 backdrop-blur-md ${
+                currIdx < i ? '' : currIdx > i ? '' : ''
+              }`}
+              onClick={() => setPage(v.page)}
+              onMouseEnter={() => audio.playFromPool('fx_focus')}
+            >
+              {v.name}
+            </button>
+          ))}
+          {/* <SettingsDialog
+            trigger={
+              <button
+                className={className}
+                onMouseEnter={() => audio.playFromPool('fx_focus')}
+              >
+                설정
+              </button>
+            }
+          /> */}
+        </section>
       </section>
-      <button onClick={() => setPage('game')}>Start</button>
-      <button onClick={() => audio.getPlayer('bgm_home')?.start()}>
-        Play Sound
-      </button>
-      <br />
-      <button onClick={() => audio.setBgmMuffled(true)}>모달 효과 적용</button>
-      <button onClick={() => audio.setBgmMuffled(false)}>모달 효과 해제</button>
+      <PlayerBottom fft={bgmFFT} />
     </MainContainer>
   )
 }
