@@ -43,7 +43,7 @@ class AudioManager {
 
     if (key === 'bgm' || key === 'song') {
       fft = new Tone.FFT({
-        size: 1024,
+        size: 64,
         smoothing: 0,
       })
       player.connect(fft)

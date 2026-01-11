@@ -12,6 +12,12 @@ type SettingState = {
   setEffectVolume: (volume: number) => void
   songVolume: number
   setSongVolume: (volume: number) => void
+  key4: string[]
+  setKey4: (keys: string[]) => void
+  key5: string[]
+  setKey5: (keys: string[]) => void
+  key6: string[]
+  setKey6: (keys: string[]) => void
 }
 
 export const useSettingStore = create<SettingState>()(
@@ -27,6 +33,12 @@ export const useSettingStore = create<SettingState>()(
       setEffectVolume: (volume: number) => set({ effectVolume: volume }),
       songVolume: -10,
       setSongVolume: (volume: number) => set({ songVolume: volume }),
+      key4: ['d', 'f', 'j', 'k'],
+      setKey4: (keys: string[]) => set({ key4: keys }),
+      key5: ['s', 'd', 'f|j', 'k', 'l'],
+      setKey5: (keys: string[]) => set({ key5: keys }),
+      key6: ['s', 'd', 'f', 'j', 'k', 'l'],
+      setKey6: (keys: string[]) => set({ key6: keys }),
     }),
     {
       name: 'setting',

@@ -25,7 +25,7 @@ export function PlayerBottom({ fft }: Props) {
       const width = canvas.width
       const height = canvas.height
       const barCount = data.length
-      const barWidth = width / barCount
+      const barWidth = width / barCount - 2
 
       ctx.clearRect(0, 0, width, height)
 
@@ -42,7 +42,7 @@ export function PlayerBottom({ fft }: Props) {
 
         ctx.fillStyle = '#000000'
         ctx.fillRect(
-          i * barWidth, // 왼쪽 = 저음
+          i * barWidth + i * 2, // 왼쪽 = 저음
           height - barHeight, // 아래 기준으로 위로
           barWidth,
           barHeight
@@ -63,7 +63,7 @@ export function PlayerBottom({ fft }: Props) {
           wjknnn
         </p>
       </div>
-      <canvas ref={canvasRef} width={280} height={80} className='mb-1' />
+      <canvas ref={canvasRef} width={360} height={80} className='mb-1' />
     </div>
   )
 }

@@ -4,31 +4,22 @@ import { useCommonStore, type Page } from '@/store'
 import { MainContainer } from '@/components/MainContainer'
 import { PlayerBottom } from '@/components/PlayerBottom'
 import { type ToneFFT } from '@/audio/AudioManager'
+import { SettingsDialog } from '@/components/dialog/SettingsDialog'
 
 export default function HomePage() {
   const [bgmFFT, setBgmFFT] = useState<ToneFFT>()
-  const [currIdx] = useState<number>(0)
 
   const { setPage } = useCommonStore()
 
   const audio = useAudioManager()
 
-  const buttons: { name: string; page: Page }[] = [
+  const buttons: { name: string; page?: Page }[] = [
     {
       name: '음악 선택',
       page: 'musicList',
     },
     {
-      name: '음악 선택',
-      page: 'musicList',
-    },
-    {
-      name: '음악 선택',
-      page: 'musicList',
-    },
-    {
-      name: '음악 선택',
-      page: 'musicList',
+      name: '설정',
     },
   ]
 
@@ -52,35 +43,41 @@ export default function HomePage() {
       })
   }, [])
 
+  const className =
+    'border p-4 rounded-lg border-zinc-200 w-[400px] hover:bg-zinc-100 transition-colors cursor-pointer'
+
   return (
     <MainContainer className='flex-col bg-white text-black'>
       <section className='flex-1 flex flex-col justify-center items-center'>
         <h1 className='text-[48px] font-black mb-10 perfect-gradient-text saturate-200 contrast-75'>
           VIBEATS
         </h1>
-        <section className='w-full flex gap-10 perspective-near'>
-          {buttons.map((v, i) => (
-            <button
-              key={i}
-              className={`border border-zinc-200 min-w-[40dvw] h-[320px] rounded-[20px] bg-white/20 backdrop-blur-md ${
-                currIdx < i ? '' : currIdx > i ? '' : ''
-              }`}
-              onClick={() => setPage(v.page)}
-              onMouseEnter={() => audio.playFromPool('fx_focus')}
-            >
-              {v.name}
-            </button>
-          ))}
-          {/* <SettingsDialog
-            trigger={
+        <section className='w-full flex flex-col gap-5'>
+          {buttons.map((v, i) =>
+            v.page ? (
               <button
-                className={className}
+                key={i}
+                onClick={() => v.page && setPage(v.page)}
                 onMouseEnter={() => audio.playFromPool('fx_focus')}
+                className={className}
               >
-                설정
+                {v.name}
               </button>
-            }
-          /> */}
+            ) : (
+              <SettingsDialog
+                key={i}
+                trigger={
+                  <button
+                    key={i}
+                    onMouseEnter={() => audio.playFromPool('fx_focus')}
+                    className={className}
+                  >
+                    설정
+                  </button>
+                }
+              />
+            )
+          )}
         </section>
       </section>
       <PlayerBottom fft={bgmFFT} />
