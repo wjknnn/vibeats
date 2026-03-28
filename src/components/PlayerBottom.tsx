@@ -26,7 +26,7 @@ export function PlayerBottom({ analyser }: Props) {
       const width = canvas.width
       const height = canvas.height
       const barCount = dataArray.length
-      const barWidth = width / barCount
+      const barWidth = width / barCount - 2
 
       ctx.clearRect(0, 0, width, height)
 
@@ -39,7 +39,7 @@ export function PlayerBottom({ analyser }: Props) {
         gradient.addColorStop(0, 'rgba(120,160,255,0.6)')
         gradient.addColorStop(1, 'rgba(180,140,255,0.1)')
         ctx.fillStyle = gradient
-        ctx.fillRect(i * barWidth, height - barHeight, barWidth, barHeight)
+        ctx.fillRect(i * barWidth + i * 2, height - barHeight, barWidth, barHeight)
       }
     }
 
@@ -60,7 +60,7 @@ export function PlayerBottom({ analyser }: Props) {
           wjknnn
         </p>
       </div>
-      <canvas ref={canvasRef} width={280} height={80} className='mb-1 opacity-60' />
+      <canvas ref={canvasRef} width={360} height={80} className='mb-1 opacity-60' />
     </div>
   )
 }

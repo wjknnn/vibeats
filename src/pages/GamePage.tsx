@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useAudio } from '@/audio/AudioEngineContext'
 import { useSettingStore, useCommonStore } from '@/store'
-import { GameEngine, JUDGE_COLOR, JUDGE_WINDOW, type JudgeResult } from '@/engine'
+import {
+  GameEngine,
+  JUDGE_COLOR,
+  JUDGE_WINDOW,
+  type JudgeResult,
+} from '@/engine'
 import { loadBeatmap } from '@/data/beatmap'
 import { getSongById } from '@/data/songs'
 import { Player } from '@/components'
@@ -34,10 +39,11 @@ function JudgeBar({ offset }: { offset: number }) {
     <div className='absolute left-1/2 bottom-[calc(50%-100px)] w-[160px] h-5 -translate-x-1/2 z-50 pointer-events-none'>
       <div className='absolute inset-0 rounded-full bg-white/[0.04] border border-white/[0.08]' />
       {/* PERFECT 구간 표시 */}
-      <div className='absolute top-0 h-full rounded-full bg-white/[0.06]'
+      <div
+        className='absolute top-0 h-full rounded-full bg-white/[0.06]'
         style={{
           left: `${((JUDGE_WINDOW.BAD - JUDGE_WINDOW.PERFECT) / range) * 100}%`,
-          width: `${(JUDGE_WINDOW.PERFECT * 2 / range) * 100}%`,
+          width: `${((JUDGE_WINDOW.PERFECT * 2) / range) * 100}%`,
         }}
       />
       {/* 중앙선 */}
@@ -66,14 +72,17 @@ export default function GamePage() {
   const [combo, setCombo] = useState(0)
   const [accuracy, setAccuracy] = useState(100)
   const [judgeResult, setJudgeResult] = useState<JudgeResult | null>(null)
-  const [pressedLanes, setPressedLanes] = useState<boolean[]>(new Array(keys).fill(false))
+  const [pressedLanes, setPressedLanes] = useState<boolean[]>(
+    new Array(keys).fill(false),
+  )
   const [currentSpeed, setCurrentSpeed] = useState(speed)
 
   const approachTimeMsRef = useRef(calcApproachTime(speed))
   const initialApproachRef = useRef(calcApproachTime(speed))
   const song = getSongById(selectedMusicId ?? 1)
   const laneWidth = PLAYER_WIDTH / keys
-  const judgeLine = typeof window !== 'undefined' ? window.innerHeight * 0.8 : 600
+  const judgeLine =
+    typeof window !== 'undefined' ? window.innerHeight * 0.8 : 600
 
   // 노트 DOM 렌더 루프
   const startRenderLoop = useCallback(() => {
@@ -122,7 +131,9 @@ export default function GamePage() {
           const endProgress = timeUntilEnd / approachMs
           const endY = jLine - endProgress * jLine
 
-          const headY = note.holding ? jLine : Math.min(startY, jLine + NOTE_HEIGHT)
+          const headY = note.holding
+            ? jLine
+            : Math.min(startY, jLine + NOTE_HEIGHT)
           const tailY = endY
 
           const top = tailY - NOTE_HEIGHT
@@ -200,7 +211,10 @@ export default function GamePage() {
     const prev = lastPressedRef.current
     let changed = false
     for (let i = 0; i < lp.length; i++) {
-      if (lp[i] !== prev[i]) { changed = true; break }
+      if (lp[i] !== prev[i]) {
+        changed = true
+        break
+      }
     }
     if (changed) {
       lastPressedRef.current = [...lp]
@@ -215,7 +229,9 @@ export default function GamePage() {
 
     const [raw] = await Promise.all([
       loadBeatmap(song.beatmapUrl),
-      audio.addPlayer('song', String(song.id), song.musicUrl, { volume: song.volume }),
+      audio.addPlayer('song', String(song.id), song.musicUrl, {
+        volume: song.volume,
+      }),
     ])
 
     const engine = new GameEngine({ keys, approachTimeMs: initApproach })
@@ -239,9 +255,12 @@ export default function GamePage() {
     engine.start()
     startRenderLoop()
 
-    musicTimerRef.current = window.setTimeout(() => {
-      audio.play(songPlayerId)
-    }, initApproach + (song.offset ?? 0))
+    musicTimerRef.current = window.setTimeout(
+      () => {
+        audio.play(songPlayerId)
+      },
+      initApproach + (song.offset ?? 0),
+    )
   }, [song, audio, keys, navigate, onEngineUpdate, startRenderLoop])
 
   useEffect(() => {
@@ -298,7 +317,8 @@ export default function GamePage() {
   return (
     <main className='min-h-dvh w-full flex justify-center items-start overflow-hidden bg-[#050508]'>
       {/* 콤보/정확도 — 플레이어 왼쪽 */}
-      <div className='fixed top-[55%] z-[100] text-right pointer-events-none'
+      <div
+        className='fixed top-[55%] z-[100] text-right pointer-events-none'
         style={{ right: `calc(50% + ${PLAYER_WIDTH / 2 + 40}px)` }}
       >
         {combo > 0 && (
@@ -317,7 +337,8 @@ export default function GamePage() {
       </div>
 
       {/* 속도 표시 — 플레이어 오른쪽 하단 */}
-      <div className='fixed bottom-8 z-[100] pointer-events-none'
+      <div
+        className='fixed bottom-8 z-[100] pointer-events-none'
         style={{ left: `calc(50% + ${PLAYER_WIDTH / 2 + 24}px)` }}
       >
         <div className='text-[13px] font-medium text-white/20 tabular-nums'>
@@ -327,7 +348,10 @@ export default function GamePage() {
 
       <Player>
         {/* 노트 컨테이너 */}
-        <div ref={notesContainerRef} className='absolute inset-0 pointer-events-none z-20' />
+        <div
+          ref={notesContainerRef}
+          className='absolute inset-0 pointer-events-none z-20'
+        />
 
         {/* 레인 키프레스 이펙트 */}
         {pressedLanes.map((pressed, index) => {
@@ -387,14 +411,17 @@ export default function GamePage() {
             className='absolute left-1/2 z-30 pointer-events-none'
             style={{
               bottom: 'calc(20dvh + 40px)',
-              animation: 'judge-hit 0.5s cubic-bezier(0.4, 0.1, 0.2, 1.24) forwards',
+              animation:
+                'judge-hit 0.5s cubic-bezier(0.4, 0.1, 0.2, 1.24) forwards',
             }}
           >
             <div
               className={`text-[36px] font-black tracking-tight ${JUDGE_COLOR[judgeResult.type]}`}
               style={{
-                textShadow: '0 0 20px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.6)',
-                filter: judgeResult.type === 'PERFECT' ? 'brightness(1.2)' : 'none',
+                textShadow:
+                  '0 0 20px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.6)',
+                filter:
+                  judgeResult.type === 'PERFECT' ? 'brightness(1.2)' : 'none',
               }}
             >
               {judgeResult.type}
@@ -420,7 +447,8 @@ export default function GamePage() {
             style={{
               top: '-8px',
               height: '20px',
-              background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.03), transparent)',
+              background:
+                'linear-gradient(to bottom, transparent, rgba(255,255,255,0.03), transparent)',
             }}
           />
         </div>
@@ -430,7 +458,8 @@ export default function GamePage() {
           className='absolute w-full left-0 bottom-0 z-[5]'
           style={{
             top: '80dvh',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%)',
+            background:
+              'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%)',
           }}
         />
       </Player>
