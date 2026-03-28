@@ -1,20 +1,18 @@
-import { useAudioManager } from '@/audio/AudioManagerContext'
+import { useAudio } from '@/audio/AudioEngineContext'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 
-type SettingsDialog = {
+type SettingsDialogProps = {
   open?: boolean
   setOpen?: (open?: boolean) => void
   trigger?: React.ReactNode
 }
 
-export const SettingsDialog = ({ open, setOpen, trigger }: SettingsDialog) => {
-  const audio = useAudioManager()
+export const SettingsDialog = ({ open, setOpen, trigger }: SettingsDialogProps) => {
+  const audio = useAudio()
 
-  const onOpenChange = (open: boolean) => {
-    audio.setBgmMuffled(open, { volume: open ? -24 : -12 })
-
-    if (setOpen) setOpen(open)
-    else return open
+  const onOpenChange = (isOpen: boolean) => {
+    audio.setBgmMuffled(isOpen, { volume: isOpen ? -24 : -12 })
+    if (setOpen) setOpen(isOpen)
   }
 
   return (

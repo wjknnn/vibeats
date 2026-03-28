@@ -1,365 +1,439 @@
-import { Note, Player } from '@/components'
-import { useSettingStore } from '@/store'
-import { useCallback, useEffect, useState } from 'react'
-import { useAudioManager } from '@/audio/AudioManagerContext'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
+import { useAudio } from '@/audio/AudioEngineContext'
+import { useSettingStore, useCommonStore } from '@/store'
+import { GameEngine, JUDGE_COLOR, JUDGE_WINDOW, type JudgeResult } from '@/engine'
+import { loadBeatmap } from '@/data/beatmap'
+import { getSongById } from '@/data/songs'
+import { Player } from '@/components'
+import { PLAYER_WIDTH, NOTE_HEIGHT, KEY_BINDINGS } from '@/common/general'
 
-// import beatmap from '@/assets/beatmap/Ado - odo.json'
-import beatmap from '@/assets/beatmap/Ado - odo (hard).json'
-import { LOCAL_SPEED, NOTE_HEIGHT } from '@/common/general'
-
-type NoteData = {
-  id: string
-  order: number
-  color: string
-  height: number
-  time: number // 노트의 판정 타이밍(ms) 추가
+function calcApproachTime(speed: number) {
+  return 6000 / Math.pow(1.6, speed - 1)
 }
 
-const Judge = {
-  PERFECT: 100,
-  GREAT: 95,
-  GOOD: 90,
-  BAD: 85,
-  MISS: 0,
-} as const
+// 4키 기준 레인 색상: 외곽=보라, 안쪽=파랑
+const LANE_COLORS_4 = [
+  { note: '#c8a2ff', glow: 'rgba(180,140,255,0.4)', head: '#b87aff' },
+  { note: '#7ab8ff', glow: 'rgba(100,170,255,0.4)', head: '#5a9fff' },
+  { note: '#7ab8ff', glow: 'rgba(100,170,255,0.4)', head: '#5a9fff' },
+  { note: '#c8a2ff', glow: 'rgba(180,140,255,0.4)', head: '#b87aff' },
+]
 
-const JudgeColor = {
-  PERFECT: 'perfect-gradient-text',
-  GREAT: 'text-[#ED9CFF]',
-  GOOD: 'text-[#6ACBFF]',
-  BAD: 'text-[#7EFFBE]',
-  MISS: 'text-[#EFEFEF]',
-} as const
-
-type JudgeResult = {
-  id: string
-  judge: keyof typeof Judge
-  offset?: number // 판정 오프셋(ms), 음수면 빠름, 양수면 느림
+function getLaneColor(lane: number, keys: number) {
+  if (keys === 4) return LANE_COLORS_4[lane]
+  // 기본
+  return { note: '#c8a2ff', glow: 'rgba(180,140,255,0.4)', head: '#b87aff' }
 }
 
-const LOCAL_OFFSET = 155
-
-// 판정 기준(ms)
-const JUDGE_WINDOW = {
-  PERFECT: 40,
-  GREAT: 80,
-  GOOD: 120,
-  BAD: 180,
-  // MISS는 BAD보다 넓게 두지만, 입력 판정에는 사용하지 않음
-  MISS: 9999,
-} as const
-
-// 입력 시간과 노트 시간의 차이로 판정 반환
-function getJudge(noteTime: number, inputTime: number): keyof typeof Judge {
-  const diff = Math.abs(noteTime - inputTime)
-  if (diff <= JUDGE_WINDOW.PERFECT) return 'PERFECT'
-  if (diff <= JUDGE_WINDOW.GREAT) return 'GREAT'
-  if (diff <= JUDGE_WINDOW.GOOD) return 'GOOD'
-  if (diff <= JUDGE_WINDOW.BAD) return 'BAD'
-  return 'MISS'
+function JudgeBar({ offset }: { offset: number }) {
+  const range = JUDGE_WINDOW.BAD * 2
+  const percent = Math.max(0, Math.min(1, (offset + JUDGE_WINDOW.BAD) / range))
+  const isEarly = offset < 0
+  return (
+    <div className='absolute left-1/2 bottom-[calc(50%-100px)] w-[160px] h-5 -translate-x-1/2 z-50 pointer-events-none'>
+      <div className='absolute inset-0 rounded-full bg-white/[0.04] border border-white/[0.08]' />
+      {/* PERFECT 구간 표시 */}
+      <div className='absolute top-0 h-full rounded-full bg-white/[0.06]'
+        style={{
+          left: `${((JUDGE_WINDOW.BAD - JUDGE_WINDOW.PERFECT) / range) * 100}%`,
+          width: `${(JUDGE_WINDOW.PERFECT * 2 / range) * 100}%`,
+        }}
+      />
+      {/* 중앙선 */}
+      <div className='absolute left-1/2 top-[2px] bottom-[2px] w-[2px] -translate-x-[1px] bg-white/30 rounded-full' />
+      {/* 판정 위치 */}
+      <div
+        style={{ left: `${percent * 100}%` }}
+        className={`absolute top-[1px] bottom-[1px] w-[3px] -translate-x-[1px] rounded-full z-50 ${
+          isEarly ? 'bg-cyan-400' : 'bg-amber-400'
+        }`}
+      />
+    </div>
+  )
 }
 
 export default function GamePage() {
-  const [isStarted, setIsStarted] = useState(false)
-  const [noteData, setNoteData] = useState<NoteData[]>([])
-  const [isPress, setIsPress] = useState<boolean[]>([
-    false,
-    false,
-    false,
-    false,
-  ])
-  const [judgeResult, setJudgeResult] = useState<JudgeResult | undefined>(
-    undefined
-  )
+  const navigate = useNavigate()
+  const audio = useAudio()
+  const { speed, keys, setSpeed } = useSettingStore()
+  const { selectedMusicId } = useCommonStore()
+  const engineRef = useRef<GameEngine | null>(null)
+  const musicTimerRef = useRef<number>(0)
+  const notesContainerRef = useRef<HTMLDivElement>(null)
+  const renderRafRef = useRef(0)
+
   const [combo, setCombo] = useState(0)
-  const [judgeHistory, setJudgeHistory] = useState<(keyof typeof Judge)[]>([])
-  const [of, setOf] = useState<number>(0)
+  const [accuracy, setAccuracy] = useState(100)
+  const [judgeResult, setJudgeResult] = useState<JudgeResult | null>(null)
+  const [pressedLanes, setPressedLanes] = useState<boolean[]>(new Array(keys).fill(false))
+  const [currentSpeed, setCurrentSpeed] = useState(speed)
 
-  const audio = useAudioManager()
+  const approachTimeMsRef = useRef(calcApproachTime(speed))
+  const initialApproachRef = useRef(calcApproachTime(speed))
+  const song = getSongById(selectedMusicId ?? 1)
+  const laneWidth = PLAYER_WIDTH / keys
+  const judgeLine = typeof window !== 'undefined' ? window.innerHeight * 0.8 : 600
 
-  const { speed } = useSettingStore()
-
-  const end = (id: string) => {
-    setNoteData((prev) => prev.filter((v) => v.id !== id))
-  }
-
-  const playMusic = useCallback(async () => {
-    if (isStarted) return
-    setIsStarted(true)
-
-    const viewHeight = window.innerHeight * 0.8
-    const node = audio.getPlayer(`song_${data.id}`)
-    if (!node) return
-
-    const startDelay = (LOCAL_SPEED * 1000) / speed + data.offset
-
-    setTimeout(() => {
-      node.player.start()
-      setOf(node.player.now())
-    }, startDelay)
-    console.log('play once!')
-
-    for (const note of beatmap.map) {
-      const [order, delay, longDelay] = note
-
-      const height =
-        longDelay > 1
-          ? ((longDelay - delay) / 1000) * viewHeight + NOTE_HEIGHT
-          : NOTE_HEIGHT
-
-      setTimeout(() => {
-        setNoteData((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            order,
-            color: order === 0 || order === 3 ? 'rgb(221, 215, 236)' : 'blue',
-            height,
-            time: delay + LOCAL_OFFSET, // 판정 타이밍(ms) 저장
-          },
-        ])
-      }, delay + LOCAL_OFFSET)
-    }
-  }, [isStarted, speed, data])
-
-  // 노트별로 입력 타이밍과 비교하여 판정
-  const handleJudge = useCallback(
-    (order: number) => {
-      const now = (audio.getPlayer(`song_${data.id}`)?.player.now() ?? 0) - of
-      const candidates = noteData
-        .filter((note) => note.order === order)
-        .map((note) => ({
-          note,
-          diff: Math.abs(note.time - now * 1000),
-          offset: now * 1000 - note.time, // (+)면 느림, (-)면 빠름
-        }))
-        .filter(({ diff }) => diff <= JUDGE_WINDOW.BAD)
-      console.log(candidates, noteData, order, now * 1000)
-      if (candidates.length === 0) return
-
-      const { note, offset } = candidates.sort((a, b) => a.diff - b.diff)[0]
-      const judge = getJudge(note.time, now * 1000)
-
-      setJudgeResult({
-        id: crypto.randomUUID(),
-        judge,
-        offset,
-      })
-
-      // 콤보/정확도 갱신 (MISS가 아니면 1씩만 증가)
-      setJudgeHistory((prev) => [...prev, judge])
-      if (judge !== 'MISS') {
-        setCombo((prev) => prev + 1)
-      } else {
-        setCombo(0)
+  // 노트 DOM 렌더 루프
+  const startRenderLoop = useCallback(() => {
+    const render = () => {
+      const engine = engineRef.current
+      const container = notesContainerRef.current
+      if (!engine || !container) {
+        renderRafRef.current = requestAnimationFrame(render)
+        return
       }
 
-      end(note.id)
-    },
-    [noteData, audio, data, of]
-  )
+      const state = engine.state
+      const gameTime = state.gameTimeMs
+      const approachMs = approachTimeMsRef.current
+      const visible = state.visibleNotes
+      const existingEls = container.children
+      const neededCount = visible.length
+      const lw = laneWidth
+      const noteGap = 4 // 노트 양쪽 패딩
+
+      while (container.childElementCount < neededCount) {
+        const el = document.createElement('div')
+        el.style.position = 'absolute'
+        el.style.pointerEvents = 'none'
+        el.style.borderRadius = '4px'
+        container.appendChild(el)
+      }
+      for (let i = neededCount; i < existingEls.length; i++) {
+        ;(existingEls[i] as HTMLElement).style.display = 'none'
+      }
+
+      const jLine = judgeLine
+
+      for (let i = 0; i < neededCount; i++) {
+        const note = visible[i]
+        const el = existingEls[i] as HTMLElement
+        const isLong = note.endTime > 0
+        const color = getLaneColor(note.lane, keys)
+
+        const timeUntilStart = note.time - gameTime
+        const startProgress = timeUntilStart / approachMs
+        const startY = jLine - startProgress * jLine
+
+        if (isLong) {
+          const timeUntilEnd = note.endTime - gameTime
+          const endProgress = timeUntilEnd / approachMs
+          const endY = jLine - endProgress * jLine
+
+          const headY = note.holding ? jLine : Math.min(startY, jLine + NOTE_HEIGHT)
+          const tailY = endY
+
+          const top = tailY - NOTE_HEIGHT
+          const height = headY - tailY + NOTE_HEIGHT
+
+          if (height <= 0) {
+            el.style.display = 'none'
+            continue
+          }
+
+          el.style.display = ''
+          el.style.left = `${note.lane * lw + noteGap}px`
+          el.style.width = `${lw - noteGap * 2}px`
+          el.style.top = `${top}px`
+          el.style.height = `${height}px`
+          el.style.background = `linear-gradient(180deg, ${color.note}40 0%, ${color.note}90 90%, ${color.head} 100%)`
+          el.style.borderRadius = '4px'
+          el.style.boxShadow = note.holding
+            ? `0 0 16px ${color.glow}, inset 0 -4px 8px ${color.head}80`
+            : `0 0 8px ${color.glow}60`
+          el.style.opacity = note.holding ? '1' : '0.9'
+          el.style.borderBottom = `3px solid ${color.head}`
+          el.style.borderTop = `2px solid ${color.note}60`
+        } else {
+          const top = startY - NOTE_HEIGHT
+
+          el.style.display = ''
+          el.style.left = `${note.lane * lw + noteGap}px`
+          el.style.width = `${lw - noteGap * 2}px`
+          el.style.height = `${NOTE_HEIGHT}px`
+          el.style.top = `${top}px`
+          el.style.background = `linear-gradient(180deg, ${color.note}cc, ${color.head})`
+          el.style.borderRadius = '4px'
+          el.style.boxShadow = `0 0 10px ${color.glow}, 0 2px 4px rgba(0,0,0,0.4)`
+          el.style.opacity = '1'
+          el.style.borderBottom = 'none'
+          el.style.borderTop = 'none'
+        }
+      }
+
+      renderRafRef.current = requestAnimationFrame(render)
+    }
+
+    renderRafRef.current = requestAnimationFrame(render)
+  }, [judgeLine, laneWidth, keys])
+
+  // 엔진 UI 콜백
+  const lastComboRef = useRef(0)
+  const lastJudgeIdRef = useRef(0)
+  const lastPressedRef = useRef<boolean[]>(new Array(keys).fill(false))
+
+  const onEngineUpdate = useCallback(() => {
+    const engine = engineRef.current
+    if (!engine) return
+    const state = engine.state
+
+    if (state.combo !== lastComboRef.current) {
+      lastComboRef.current = state.combo
+      setCombo(state.combo)
+      setAccuracy(state.accuracy)
+    }
+
+    const jr = state.judgeResult
+    if (jr && jr.id !== lastJudgeIdRef.current) {
+      lastJudgeIdRef.current = jr.id
+      setJudgeResult({ ...jr })
+      setCombo(state.combo)
+      setAccuracy(state.accuracy)
+    } else if (!jr && lastJudgeIdRef.current !== 0) {
+      lastJudgeIdRef.current = 0
+      setJudgeResult(null)
+    }
+
+    const lp = state.pressedLanes
+    const prev = lastPressedRef.current
+    let changed = false
+    for (let i = 0; i < lp.length; i++) {
+      if (lp[i] !== prev[i]) { changed = true; break }
+    }
+    if (changed) {
+      lastPressedRef.current = [...lp]
+      setPressedLanes([...lp])
+    }
+  }, [])
+
+  const startGame = useCallback(async () => {
+    if (!song) return
+    const songPlayerId = `song_${song.id}`
+    const initApproach = initialApproachRef.current
+
+    const [raw] = await Promise.all([
+      loadBeatmap(song.beatmapUrl),
+      audio.addPlayer('song', String(song.id), song.musicUrl, { volume: song.volume }),
+    ])
+
+    const engine = new GameEngine({ keys, approachTimeMs: initApproach })
+    engine.loadBeatmap(raw.map)
+    engine.setOnUpdate(onEngineUpdate)
+    engine.setOnFinish(() => {
+      audio.stop(songPlayerId)
+      const score = engine.score
+      navigate('/result', {
+        replace: true,
+        state: {
+          accuracy: score.accuracy,
+          maxCombo: score.maxCombo,
+          totalNotes: score.totalNotes,
+          counts: score.counts,
+        },
+      })
+    })
+
+    engineRef.current = engine
+    engine.start()
+    startRenderLoop()
+
+    musicTimerRef.current = window.setTimeout(() => {
+      audio.play(songPlayerId)
+    }, initApproach + (song.offset ?? 0))
+  }, [song, audio, keys, navigate, onEngineUpdate, startRenderLoop])
 
   useEffect(() => {
-    const convertToOrder = (key: string) => {
-      if (key === 'd') return 0
-      if (key === 'f') return 1
-      if (key === 'j') return 2
-      if (key === 'k') return 3
-    }
-
+    const keyMap = KEY_BINDINGS[keys] ?? KEY_BINDINGS[4]
     const handleKeyDown = (e: KeyboardEvent) => {
-      const order = convertToOrder(e.key)
-      if (order === undefined) return
-      setIsPress((prev) => {
-        if (prev[order]) return prev
-        handleJudge(order)
-        const newIsPress = [...prev]
-        newIsPress[order] = true
-        return newIsPress
-      })
+      if (e.key === '=' || e.key === '+') {
+        setCurrentSpeed((prev) => {
+          const next = Math.min(7, Math.round((prev + 0.1) * 10) / 10)
+          approachTimeMsRef.current = calcApproachTime(next)
+          engineRef.current?.setApproachTime(approachTimeMsRef.current)
+          setSpeed(next)
+          return next
+        })
+        return
+      }
+      if (e.key === '-') {
+        setCurrentSpeed((prev) => {
+          const next = Math.max(1, Math.round((prev - 0.1) * 10) / 10)
+          approachTimeMsRef.current = calcApproachTime(next)
+          engineRef.current?.setApproachTime(approachTimeMsRef.current)
+          setSpeed(next)
+          return next
+        })
+        return
+      }
+      const lane = keyMap.indexOf(e.key)
+      if (lane === -1) return
+      engineRef.current?.handleKeyDown(lane)
     }
-
     const handleKeyUp = (e: KeyboardEvent) => {
-      const order = convertToOrder(e.key)
-      if (order === undefined) return
-      setIsPress((prev) => {
-        const newIsPress = [...prev]
-        newIsPress[order] = false
-        return newIsPress
-      })
+      const lane = keyMap.indexOf(e.key)
+      if (lane === -1) return
+      engineRef.current?.handleKeyUp(lane)
     }
-
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
-
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [data, handleJudge])
+  }, [keys, setSpeed])
 
   useEffect(() => {
-    setOf(0)
-    const timer = setTimeout(() => {
-      playMusic()
-    }, 3000)
-    audio.addPlayer('song', data.id, data.url, {
-      volume: data.volume,
-      onstop: () => setIsStarted(false),
-    })
-    return () => clearTimeout(timer)
-  }, [data])
-
-  // MISS 판정: BAD 범위 밖으로 내려간 노트 자동 처리
-  useEffect(() => {
-    if (!isStarted) return
-    const timer = setInterval(() => {
-      const now = (audio.getPlayer(`song_${data.id}`)?.player.now() ?? 0) - of
-      setNoteData((prev) => {
-        let missed = false
-        const remain: NoteData[] = []
-        prev.forEach((note) => {
-          if (now * 1000 - note.time > JUDGE_WINDOW.BAD) {
-            if (!missed) {
-              setJudgeResult({
-                id: crypto.randomUUID(),
-                judge: 'MISS',
-              })
-              setCombo(0)
-              missed = true
-            }
-            // 정확도 갱신 (MISS 여러개라도 1번만 추가)
-            if (!missed) {
-              setJudgeHistory((prev) => [...prev, 'MISS'])
-            }
-          } else {
-            remain.push(note)
-          }
-        })
-        // MISS가 한 번이라도 발생했으면 judgeHistory에 MISS 한 번만 추가
-        if (missed) {
-          setJudgeHistory((prev) => [...prev, 'MISS'])
-        }
-        return remain
-      })
-    }, 100)
-    return () => clearInterval(timer)
-  }, [isStarted, audio, data, of])
-
-  // 정확도 계산 (소수점 한자리)
-  const total = judgeHistory.length
-  const score = judgeHistory.reduce((n, v) => (n += Judge[v]), 0)
-  const accuracy = total === 0 ? 100 : (score / total).toFixed(2)
-
-  // 판정 바 UI 컴포넌트
-  function JudgeBar({ offset }: { offset: number }) {
-    // offset: ms, -BAD~+BAD 구간에서 위치를 0~100%로 변환
-    const range = JUDGE_WINDOW.BAD * 2
-    const percent = Math.max(
-      0,
-      Math.min(1, (offset + JUDGE_WINDOW.BAD) / range)
-    )
-    return (
-      <div className='absolute left-[50%] bottom-[calc(50%-80px)] w-[140px] h-6 translate-x-[-50%] z-50 pointer-events-none'>
-        <div className='absolute left-0 top-0 h-full w-full bg-gradient-to-r from-transparent via-neutral-800/50 to-transparent' />
-        {/* 중앙선 */}
-        <div className='absolute left-[50%] top-0 h-full w-1 translate-x-[-2px] bg-white/80' />
-        {/* 판정 위치 선 */}
-        <div
-          style={{
-            left: `${percent * 100}%`,
-          }}
-          className='absolute top-0 h-full w-[2px] bg-sky-500 translate-x-[-1px] z-50'
-        />
-      </div>
-    )
-  }
+    const timer = setTimeout(() => startGame(), 500)
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(musicTimerRef.current)
+      cancelAnimationFrame(renderRafRef.current)
+      engineRef.current?.destroy()
+      if (song) audio.removePlayer(`song_${song.id}`)
+    }
+  }, [startGame, song, audio])
 
   return (
-    <main className='min-h-dvh w-full flex justify-center items-start overflow-hidden'>
-      {/* 콤보/정확도 표시 */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '60%',
-          right: '43%',
-          zIndex: 100,
-          textAlign: 'center',
-        }}
+    <main className='min-h-dvh w-full flex justify-center items-start overflow-hidden bg-[#050508]'>
+      {/* 콤보/정확도 — 플레이어 왼쪽 */}
+      <div className='fixed top-[55%] z-[100] text-right pointer-events-none'
+        style={{ right: `calc(50% + ${PLAYER_WIDTH / 2 + 40}px)` }}
       >
-        <div className='text-[32px] font-black text-sky-500 drop-shadow'>
-          {combo > 0 && <span>{combo} Combo</span>}
-        </div>
-        <div className='text-[18px] font-bold text-neutral-700'>
-          ACC {accuracy}%
-        </div>
-      </div>
-      <button
-        onClick={playMusic}
-        className='absolute top-5 left-5 bg-zinc-950 border border-zinc-900 rounded-[8px] px-[12px] py-[4px] cursor-pointer'
-      >
-        Start
-      </button>
-      <Player>
-        {noteData.map(({ id, order, height }) => (
-          <Note
-            key={id}
-            id={id}
-            order={order}
-            duration={(LOCAL_SPEED * 1000 * 10) / speed}
-            end={end}
-            height={height}
-          />
-        ))}
-        {isPress.map((v, index) => (
-          <div
-            key={index}
-            className={`flex-1 flex justify-center h-full bg-gradient-to-t from-transparent via-20% to-transparent relative ${
-              v ? 'via-[rgba(43,103,199,0.08)]' : 'via-transparent'
-            }`}
-          >
-            <div
-              className={`w-full h-[40dvh] absolute left-0 bottom-[20dvh] bg-gradient-to-t to-transparent ${
-                v ? 'from-[rgba(69,178,255,0.16)]' : 'from-transparent'
-              }`}
-            />
-            {judgeResult && v && (
-              <div
-                key={judgeResult.id}
-                className='absolute bottom-[calc(20dvh-50px)] size-[100px] rounded-full bg-sky-500 animate-showJudge z-40'
-              />
-            )}
-          </div>
-        ))}
-        {judgeResult && (
-          <div
-            key={judgeResult.id}
-            className='absolute top-0 left-0 w-full h-full flex justify-center items-center animate-showJudge z-10'
-          >
-            <div
-              className={`text-[40px] font-extrabold tracking-[-2%] text-shadow-2xs ${
-                JudgeColor[judgeResult.judge]
-              }`}
-            >
-              {judgeResult.judge}
+        {combo > 0 && (
+          <div key={combo} className='combo-pop'>
+            <div className='text-[56px] font-black leading-none text-white drop-shadow-[0_0_20px_rgba(100,180,255,0.5)]'>
+              {combo}
+            </div>
+            <div className='text-[14px] font-bold tracking-[4px] text-white/50 uppercase mt-1'>
+              combo
             </div>
           </div>
         )}
+        <div className='text-[16px] font-bold text-white/30 mt-4 tabular-nums'>
+          {accuracy.toFixed(2)}%
+        </div>
+      </div>
+
+      {/* 속도 표시 — 플레이어 오른쪽 하단 */}
+      <div className='fixed bottom-8 z-[100] pointer-events-none'
+        style={{ left: `calc(50% + ${PLAYER_WIDTH / 2 + 24}px)` }}
+      >
+        <div className='text-[13px] font-medium text-white/20 tabular-nums'>
+          {currentSpeed.toFixed(1)}x
+        </div>
+      </div>
+
+      <Player>
+        {/* 노트 컨테이너 */}
+        <div ref={notesContainerRef} className='absolute inset-0 pointer-events-none z-20' />
+
+        {/* 레인 키프레스 이펙트 */}
+        {pressedLanes.map((pressed, index) => {
+          const color = getLaneColor(index, keys)
+          return (
+            <div
+              key={index}
+              style={{ left: index * laneWidth, width: laneWidth }}
+              className='absolute top-0 h-full pointer-events-none z-10'
+            >
+              {/* 키프레스 레인 하이라이트 */}
+              {pressed && (
+                <div
+                  className='absolute inset-0'
+                  style={{
+                    background: `linear-gradient(to top, ${color.glow} 0%, transparent 60%)`,
+                  }}
+                />
+              )}
+              {/* 판정선 위 히트 이펙트 */}
+              {pressed && (
+                <div
+                  className='absolute left-1/2 -translate-x-1/2'
+                  style={{
+                    bottom: '20dvh',
+                    width: laneWidth - 4,
+                    height: '6px',
+                    background: color.head,
+                    boxShadow: `0 0 20px ${color.glow}, 0 0 40px ${color.glow}`,
+                    borderRadius: '3px',
+                  }}
+                />
+              )}
+              {/* 히트 원형 이펙트 */}
+              {judgeResult && pressed && (
+                <div
+                  key={judgeResult.id}
+                  className='absolute left-1/2 -translate-x-1/2 animate-showJudge z-40'
+                  style={{
+                    bottom: 'calc(20dvh - 30px)',
+                    width: 60,
+                    height: 60,
+                    borderRadius: '50%',
+                    background: `radial-gradient(circle, ${color.head}80 0%, transparent 70%)`,
+                    boxShadow: `0 0 30px ${color.glow}`,
+                  }}
+                />
+              )}
+            </div>
+          )
+        })}
+
+        {/* 판정 텍스트 */}
+        {judgeResult && (
+          <div
+            key={judgeResult.id}
+            className='absolute left-1/2 z-30 pointer-events-none'
+            style={{
+              bottom: 'calc(20dvh + 40px)',
+              animation: 'judge-hit 0.5s cubic-bezier(0.4, 0.1, 0.2, 1.24) forwards',
+            }}
+          >
+            <div
+              className={`text-[36px] font-black tracking-tight ${JUDGE_COLOR[judgeResult.type]}`}
+              style={{
+                textShadow: '0 0 20px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.6)',
+                filter: judgeResult.type === 'PERFECT' ? 'brightness(1.2)' : 'none',
+              }}
+            >
+              {judgeResult.type}
+            </div>
+          </div>
+        )}
+
+        {/* 판정 바 */}
         {judgeResult && typeof judgeResult.offset === 'number' && (
           <JudgeBar offset={judgeResult.offset} />
         )}
-        <div className='absolute top-[calc(80dvh-4px)] bg-white h-[8px] w-full left-0' />
+
+        {/* 판정선 */}
+        <div
+          className='absolute w-full left-0 z-30'
+          style={{ top: 'calc(80dvh - 2px)' }}
+        >
+          <div className='h-[3px] w-full bg-gradient-to-r from-transparent via-white/90 to-transparent' />
+          <div className='h-[1px] w-full bg-gradient-to-r from-transparent via-white/20 to-transparent mt-[1px]' />
+          {/* 판정선 글로우 */}
+          <div
+            className='absolute left-0 w-full'
+            style={{
+              top: '-8px',
+              height: '20px',
+              background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.03), transparent)',
+            }}
+          />
+        </div>
+
+        {/* 판정선 아래 어둡게 */}
+        <div
+          className='absolute w-full left-0 bottom-0 z-[5]'
+          style={{
+            top: '80dvh',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%)',
+          }}
+        />
       </Player>
     </main>
   )
-}
-
-const data = {
-  id: 1,
-  title: 'Odo',
-  artist: 'Ado',
-  url: '/music/Ado - Odo.mp3',
-  map: '/src/assets/beatmap/Ado - odo (hard).json',
-  offset: 0,
-  volume: -16,
 }

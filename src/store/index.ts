@@ -1,3 +1,3 @@
-export * from './settingStore'
-export * from './commonStore'
-export * from './customStore'
+export { useCommonStore } from './commonStore'
+export { useSettingStore } from './settingStore'
+export { useCustomStore } from './customStore'

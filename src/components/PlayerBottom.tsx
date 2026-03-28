@@ -1,69 +1,66 @@
 import { useEffect, useRef } from 'react'
-import * as Tone from 'tone'
 
 type Props = {
-  fft?: Tone.FFT
+  analyser?: AnalyserNode
 }
 
-export function PlayerBottom({ fft }: Props) {
+export function PlayerBottom({ analyser }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const rafRef = useRef(0)
 
   useEffect(() => {
-    if (!fft) return
+    if (!analyser) return
+
+    const dataArray = new Float32Array(analyser.frequencyBinCount)
 
     const draw = () => {
-      requestAnimationFrame(draw)
+      rafRef.current = requestAnimationFrame(draw)
 
       const canvas = canvasRef.current
       if (!canvas) return
-
       const ctx = canvas.getContext('2d')
       if (!ctx) return
 
-      const data = fft.getValue() as Float32Array
+      analyser.getFloatFrequencyData(dataArray)
 
       const width = canvas.width
       const height = canvas.height
-      const barCount = data.length
+      const barCount = dataArray.length
       const barWidth = width / barCount
 
       ctx.clearRect(0, 0, width, height)
 
       for (let i = 0; i < barCount; i++) {
-        const db = data[i]
+        const db = dataArray[i]
+        const normalized = Math.max(0, Math.min(1, (db + 100) / 100))
+        const barHeight = normalized * height
 
-        // dB (-100 ~ 0) → 0 ~ 1 (있는 그대로 정규화)
-        const normalized = (db + 100) / 100
-
-        // 클램프만 수행 (시각 안정성)
-        const clamped = Math.max(0, Math.min(1, normalized))
-
-        const barHeight = clamped * height
-
-        ctx.fillStyle = '#000000'
-        ctx.fillRect(
-          i * barWidth, // 왼쪽 = 저음
-          height - barHeight, // 아래 기준으로 위로
-          barWidth,
-          barHeight
-        )
+        const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight)
+        gradient.addColorStop(0, 'rgba(120,160,255,0.6)')
+        gradient.addColorStop(1, 'rgba(180,140,255,0.1)')
+        ctx.fillStyle = gradient
+        ctx.fillRect(i * barWidth, height - barHeight, barWidth, barHeight)
       }
     }
 
     draw()
-  }, [fft])
+
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [analyser])
 
   return (
     <div className='w-full flex gap-4 p-5 pb-12'>
       <div className='flex flex-col justify-end px-5'>
-        <p className='font-semibold text-[18px] animate-appearBottom opacity-0 delay-500'>
+        <p className='font-semibold text-[18px] text-white/80 animate-appearBottom opacity-0 [animation-delay:500ms]'>
           VIBEATS
         </p>
-        <p className='text-zinc-500 animate-appearBottom opacity-0 delay-1000'>
+        <p className='text-white/30 text-[14px] animate-appearBottom opacity-0 [animation-delay:1000ms]'>
           wjknnn
         </p>
       </div>
-      <canvas ref={canvasRef} width={280} height={80} className='mb-1' />
+      <canvas ref={canvasRef} width={280} height={80} className='mb-1 opacity-60' />
     </div>
   )
 }

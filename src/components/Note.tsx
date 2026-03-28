@@ -1,33 +1,31 @@
-import { NOTE_HEIGHT, PLAYER_WIDTH } from '@/common/general'
-import { NOTE_SKIN } from '@/common/skin'
-import { useSettingStore, useCustomStore } from '@/store'
+import { PLAYER_WIDTH, NOTE_HEIGHT } from '@/common/general'
+import { useSettingStore } from '@/store'
 
 export type NoteProps = {
-  id: string
-  order: number
-  duration: number
+  lane: number
+  /** 0 = 판정선 위치, 1 = 화면 맨 위. 음수 = 판정선 아래 */
+  progress: number
   height: number
-  end: (id: string) => void
 }
 
-export const Note = ({ id, order, duration, height, end }: NoteProps) => {
-  const { noteSkin } = useCustomStore()
+export const Note = ({ lane, progress, height }: NoteProps) => {
   const { keys } = useSettingStore()
+  const laneWidth = PLAYER_WIDTH / keys
+  const judgeLine = window.innerHeight * 0.8
+  const h = height || NOTE_HEIGHT
 
-  const skin = NOTE_SKIN[noteSkin]
-  const h = height ?? skin.height
+  // progress: 1(맨 위) -> 0(판정선)
+  const top = judgeLine - progress * judgeLine - h
 
   return (
     <div
       style={{
-        animationDuration: `${duration}ms`,
-        left: order * 121,
+        left: lane * laneWidth,
+        width: laneWidth,
         height: h,
-        top: -h + NOTE_HEIGHT / 2,
-        width: PLAYER_WIDTH / keys,
+        top,
       }}
-      onAnimationEnd={() => end(id)}
-      className='rounded-md animate-falling absolute bg-white'
+      className='rounded-md absolute bg-white pointer-events-none'
     />
   )
 }
