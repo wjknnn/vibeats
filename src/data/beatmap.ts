@@ -5,6 +5,10 @@
 export type BeatmapEntry = [number, number, number]
 
 export type RawBeatmap = {
+  // 타이밍 정보(에디터로 수정·저장 가능). 없으면 SongData 값으로 폴백.
+  bpm?: number
+  offset?: number
+  firstBeatMs?: number
   map: BeatmapEntry[]
 }
 

@@ -90,11 +90,16 @@ export class Game {
     ])
     if (this.destroyed) return
 
+    // 타이밍: 비트맵 JSON에 있으면 우선, 없으면 SongData 폴백 (에디터 저장값 반영)
+    const bpm = raw.bpm ?? opts.song.bpm
+    const firstBeatMs = raw.firstBeatMs ?? opts.song.firstBeatMs ?? 0
+    const songOffsetMs = raw.offset ?? opts.song.offset ?? 0
+
     // 3) 엔진/렌더러/입력 구성
     this.engine = new GameEngine(this.keys)
     this.engine.loadBeatmap(raw.map)
     this.renderer = new PixiRenderer(this.app, this.keys)
-    this.renderer.configureBeatGrid(opts.song.bpm, opts.song.firstBeatMs ?? 0)
+    this.renderer.configureBeatGrid(bpm, firstBeatMs)
     this.app.renderer.on('resize', this.onResize)
 
     this.detachInput = attachInput(this.keys, {
@@ -109,7 +114,7 @@ export class Game {
     })
 
     // 4) Conductor로 시간 0 시점을 잡고, 그 시점에 오디오 재생 예약
-    this.conductor = new Conductor(audioEngine.context, opts.song.offset ?? 0)
+    this.conductor = new Conductor(audioEngine.context, songOffsetMs)
     const audioStartCtx = this.conductor.scheduleStart(this.approachMs)
     audioEngine.playScheduled(this.songId, audioStartCtx)
 

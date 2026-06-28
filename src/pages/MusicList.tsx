@@ -117,6 +117,20 @@ export default function MusicListPage() {
               >
                 PLAY
               </button>
+              {import.meta.env.DEV && selectedSong.beatmapUrl && (
+                <button
+                  onClick={() => {
+                    setSelectedMusicId(selectedSong.id)
+                    stopPreview()
+                    navigate('/editor')
+                  }}
+                  className='px-6 py-2.5 rounded-lg text-[14px] font-bold tracking-wider
+                    bg-transparent hover:bg-white/[0.06] border border-amber-400/30 hover:border-amber-400/60
+                    text-amber-300/70 hover:text-amber-300 transition-all cursor-pointer'
+                >
+                  EDIT (dev)
+                </button>
+              )}
             </div>
           </div>
         </section>
