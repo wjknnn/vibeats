@@ -154,6 +154,44 @@ class AudioEngine {
     }
   }
 
+  /**
+   * 미래의 특정 ctx 시각(초)에 재생을 예약한다. Conductor와 싱크를 맞추기 위한 용도.
+   * @param when  this.context.currentTime 기준 절대 시각(초)
+   */
+  playScheduled(id: string, when: number, offset = 0) {
+    const node = this.players.get(id)
+    if (!node) return
+
+    if (node.source) {
+      try { node.source.stop() } catch { /* already stopped */ }
+    }
+
+    const source = this.ctx.createBufferSource()
+    source.buffer = node.buffer
+    source.loop = node.loop
+    if (node.loop) {
+      source.loopStart = node.loopStart
+      source.loopEnd = node.loopEnd > 0 ? node.loopEnd : node.buffer.duration
+    }
+    source.connect(node.gainNode)
+
+    if (node.fadeIn > 0) {
+      const targetGain = node.gainNode.gain.value
+      node.gainNode.gain.setValueAtTime(0, when)
+      node.gainNode.gain.linearRampToValueAtTime(targetGain, when + node.fadeIn)
+    }
+
+    source.start(when, offset)
+    node.source = source
+    node.startedAt = when - offset
+    node.pausedAt = 0
+    node.playing = true
+
+    source.onended = () => {
+      node.playing = false
+    }
+  }
+
   stop(id: string) {
     const node = this.players.get(id)
     if (!node || !node.source) return

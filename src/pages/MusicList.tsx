@@ -66,6 +66,8 @@ export default function MusicListPage() {
     if (!song) return
 
     const id = `bgm_preview_${song.id}`
+    // 비동기 로드 중에 페이지를 떠나면(ESC/곡 변경) 뒤늦게 재생되는 것을 막는 가드
+    let cancelled = false
 
     previewTimerRef.current = window.setTimeout(async () => {
       await audio.addPlayer('bgm', `preview_${song.id}`, song.musicUrl, {
@@ -75,11 +77,19 @@ export default function MusicListPage() {
         fadeOut: 2,
         volume: song.volume,
       })
+      // 로드가 끝났을 때 이미 cleanup 됐다면: 재생하지 말고 방금 추가한 플레이어를 정리
+      if (cancelled) {
+        audio.removePlayer(id)
+        return
+      }
       currentPreviewId.current = id
       audio.play(id, song.previewStart / 1000)
     }, 500)
 
-    return () => stopPreview()
+    return () => {
+      cancelled = true
+      stopPreview()
+    }
   }, [selected, audio])
 
   const selectedSong = SONGS[selected]

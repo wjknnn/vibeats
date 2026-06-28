@@ -1,3 +1,5 @@
+// 판정 윈도우/점수 — 순수 로직. 렌더러 독립적.
+
 export const JUDGE_WINDOW = {
   PERFECT: 40,
   GREAT: 80,
@@ -15,12 +17,13 @@ export const JUDGE_SCORE = {
 
 export type JudgeType = keyof typeof JUDGE_SCORE
 
-export const JUDGE_COLOR: Record<JudgeType, string> = {
-  PERFECT: 'perfect-gradient-text',
-  GREAT: 'text-[#ED9CFF]',
-  GOOD: 'text-[#6ACBFF]',
-  BAD: 'text-[#7EFFBE]',
-  MISS: 'text-[#EFEFEF]',
+// Pixi 텍스트 색상 (0xRRGGBB)
+export const JUDGE_COLOR: Record<JudgeType, number> = {
+  PERFECT: 0xffe9a8,
+  GREAT: 0xed9cff,
+  GOOD: 0x6acbff,
+  BAD: 0x7effbe,
+  MISS: 0x8a8a92,
 }
 
 export type JudgeResult = {
@@ -30,7 +33,6 @@ export type JudgeResult = {
 }
 
 let judgeIdCounter = 0
-
 export function nextJudgeId(): number {
   return ++judgeIdCounter
 }

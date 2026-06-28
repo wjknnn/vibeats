@@ -12,7 +12,7 @@ export type NoteData = {
   // 롱노트 전용
   holding: boolean
   holdStartJudge: JudgeType | null
-  lastTickTime: number  // 마지막 틱 판정 시각
+  lastTickTime: number // 마지막 틱 판정 시각
 }
 
 let noteIdCounter = 0
@@ -20,6 +20,10 @@ export function nextNoteId(): number {
   return ++noteIdCounter
 }
 
+/**
+ * 노트 집합을 레인별로 관리하며 입력/시간에 대한 판정을 계산한다.
+ * 시각(ms)은 외부(Conductor)에서 주입받는다 — 자체 시계를 갖지 않는다.
+ */
 export class NoteTrack {
   private lanes: Map<number, NoteData[]> = new Map()
   private _allNotes: NoteData[] = []
@@ -28,9 +32,7 @@ export class NoteTrack {
     this._allNotes = notes
     this.lanes.clear()
     for (const note of notes) {
-      if (!this.lanes.has(note.lane)) {
-        this.lanes.set(note.lane, [])
-      }
+      if (!this.lanes.has(note.lane)) this.lanes.set(note.lane, [])
       this.lanes.get(note.lane)!.push(note)
     }
     this.lanes.forEach((arr) => arr.sort((a, b) => a.time - b.time))
@@ -40,7 +42,10 @@ export class NoteTrack {
     return this._allNotes
   }
 
-  tryJudge(lane: number, currentTimeMs: number): { type: JudgeType; offset: number; note: NoteData } | null {
+  tryJudge(
+    lane: number,
+    currentTimeMs: number,
+  ): { type: JudgeType; offset: number; note: NoteData } | null {
     const laneNotes = this.lanes.get(lane)
     if (!laneNotes) return null
 
@@ -76,15 +81,14 @@ export class NoteTrack {
   }
 
   /**
-   * 홀드 중인 롱노트에서 틱 판정 수집
-   * 매 LONG_NOTE_TICK_INTERVAL ms마다 PERFECT 틱 생성
+   * 홀드 중인 롱노트에서 틱 판정 수집.
+   * 매 LONG_NOTE_TICK_INTERVAL ms마다 시작 판정과 동일한 틱 생성.
    */
   collectHoldTicks(currentTimeMs: number): { type: JudgeType; note: NoteData }[] {
     const ticks: { type: JudgeType; note: NoteData }[] = []
     this.lanes.forEach((laneNotes) => {
       for (const note of laneNotes) {
         if (!note.holding) continue
-        // endTime을 넘었으면 틱 생성 안 함 (자동완료에서 처리)
         const effectiveEnd = Math.min(currentTimeMs, note.endTime)
         while (note.lastTickTime + LONG_NOTE_TICK_INTERVAL <= effectiveEnd) {
           note.lastTickTime += LONG_NOTE_TICK_INTERVAL
@@ -96,10 +100,13 @@ export class NoteTrack {
   }
 
   /**
-   * 롱노트 키 릴리즈 — 마지막 틱 판정 반환
-   * GOOD 범위 안에서 뗌 → 시작 판정 유지, 밖이면 MISS
+   * 롱노트 키 릴리즈 — 마지막 틱 판정 반환.
+   * GOOD 범위 안에서 뗌 → 시작 판정 유지, 밖이면 MISS.
    */
-  releaseLongNote(lane: number, currentTimeMs: number): { type: JudgeType; note: NoteData; remainingMissTicks: number } | null {
+  releaseLongNote(
+    lane: number,
+    currentTimeMs: number,
+  ): { type: JudgeType; note: NoteData; success: boolean; remainingTicks: number } | null {
     const laneNotes = this.lanes.get(lane)
     if (!laneNotes) return null
 
@@ -109,37 +116,39 @@ export class NoteTrack {
     holdingNote.holding = false
     holdingNote.judged = true
 
-    // 남은 틱 수 계산 (마지막 틱 포함)
     const totalTicks = Math.floor((holdingNote.endTime - holdingNote.time) / LONG_NOTE_TICK_INTERVAL)
-    const elapsedTicks = Math.floor((holdingNote.lastTickTime - holdingNote.time) / LONG_NOTE_TICK_INTERVAL)
+    const elapsedTicks = Math.floor(
+      (holdingNote.lastTickTime - holdingNote.time) / LONG_NOTE_TICK_INTERVAL,
+    )
     const remainingTicks = totalTicks - elapsedTicks
 
+    // 꼬리 윈도우(±GOOD) 안에서 떼거나 끝을 지나도록 잡았으면 성공.
+    // 못 채운 틱(remainingTicks)의 처리는 호출부(GameEngine)가 success로 판단한다.
     const diff = Math.abs(holdingNote.endTime - currentTimeMs)
-    if (diff <= JUDGE_WINDOW.GOOD || currentTimeMs >= holdingNote.endTime) {
-      // 릴리즈 자체는 OK, 하지만 못 얻은 틱은 MISS
-      return { type: holdingNote.holdStartJudge ?? 'PERFECT', note: holdingNote, remainingMissTicks: remainingTicks }
-    }
+    const success = diff <= JUDGE_WINDOW.GOOD || currentTimeMs >= holdingNote.endTime
 
-    // 너무 일찍 놓음
-    return { type: 'MISS', note: holdingNote, remainingMissTicks: remainingTicks }
+    return {
+      type: success ? (holdingNote.holdStartJudge ?? 'PERFECT') : 'MISS',
+      note: holdingNote,
+      success,
+      remainingTicks,
+    }
   }
 
   /**
-   * 홀드 중인 롱노트가 endTime을 넘긴 경우 자동 완료 — 마지막 틱 판정
-   * GOOD 범위 안 → 시작 판정 유지, BAD 범위 초과 → BAD
+   * 홀드 중인 롱노트가 endTime을 넘긴 경우 자동 완료.
+   * GOOD 윈도우 초과까지 안 뗌 → BAD로 강제 종료.
    */
   collectLongNoteAutoComplete(currentTimeMs: number): { type: JudgeType; note: NoteData }[] {
     const completed: { type: JudgeType; note: NoteData }[] = []
     this.lanes.forEach((laneNotes) => {
       for (const note of laneNotes) {
         if (!note.holding) continue
-        // GOOD 윈도우 초과까지 안 뗌 → BAD로 강제 종료
         if (currentTimeMs >= note.endTime + JUDGE_WINDOW.GOOD) {
           note.holding = false
           note.judged = true
           completed.push({ type: 'BAD', note })
         }
-        // 그 전까지는 holding 유지 (릴리즈로 판정받을 수 있게)
       }
     })
     return completed
@@ -159,6 +168,7 @@ export class NoteTrack {
     return missed
   }
 
+  /** 현재 화면에 보여야 할 노트 (판정 끝난 건 제외) */
   getVisibleNotes(currentTimeMs: number, approachTimeMs: number): NoteData[] {
     const visible: NoteData[] = []
     for (const note of this._allNotes) {
@@ -173,5 +183,10 @@ export class NoteTrack {
 
   get totalCount(): number {
     return this._allNotes.length
+  }
+
+  reset() {
+    this.lanes.clear()
+    this._allNotes = []
   }
 }

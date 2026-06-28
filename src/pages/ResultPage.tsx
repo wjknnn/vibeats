@@ -1,6 +1,15 @@
 import { useLocation, useNavigate } from 'react-router'
 import { MainContainer } from '@/components'
-import { JUDGE_COLOR, type JudgeType } from '@/engine'
+import { type JudgeType } from '@/game'
+
+// DOM(결과 화면)용 판정 색상 — CSS 클래스. (Pixi 캔버스는 숫자 색상을 따로 사용)
+const JUDGE_TEXT_COLOR: Record<JudgeType, string> = {
+  PERFECT: 'perfect-gradient-text',
+  GREAT: 'text-[#ED9CFF]',
+  GOOD: 'text-[#6ACBFF]',
+  BAD: 'text-[#7EFFBE]',
+  MISS: 'text-[#EFEFEF]',
+}
 
 type ResultState = {
   accuracy: number
@@ -84,7 +93,7 @@ export default function ResultPage() {
         <div className='flex gap-5 mt-10'>
           {(['PERFECT', 'GREAT', 'GOOD', 'BAD', 'MISS'] as const).map((j) => (
             <div key={j} className='flex flex-col items-center min-w-[64px]'>
-              <span className={`text-[11px] font-bold tracking-wider ${JUDGE_COLOR[j]}`}>
+              <span className={`text-[11px] font-bold tracking-wider ${JUDGE_TEXT_COLOR[j]}`}>
                 {j}
               </span>
               <span className='text-[26px] font-black text-white/70 tabular-nums mt-1'>

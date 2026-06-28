@@ -1,5 +1,6 @@
 import { JUDGE_SCORE, type JudgeType } from './Judge'
 
+/** 점수/콤보/정확도 집계 — 순수 로직. */
 export class ScoreManager {
   private history: JudgeType[] = []
   private _combo = 0
@@ -9,9 +10,7 @@ export class ScoreManager {
     this.history.push(judge)
     if (judge !== 'MISS') {
       this._combo++
-      if (this._combo > this._maxCombo) {
-        this._maxCombo = this._combo
-      }
+      if (this._combo > this._maxCombo) this._maxCombo = this._combo
     } else {
       this._combo = 0
     }
@@ -29,6 +28,7 @@ export class ScoreManager {
     return this.history.length
   }
 
+  /** 0~100, 판정별 점수의 평균 */
   get accuracy(): number {
     if (this.history.length === 0) return 100
     const sum = this.history.reduce((acc, j) => acc + JUDGE_SCORE[j], 0)
@@ -40,7 +40,7 @@ export class ScoreManager {
   }
 
   get counts(): Record<JudgeType, number> {
-    const c = { PERFECT: 0, GREAT: 0, GOOD: 0, BAD: 0, MISS: 0 }
+    const c: Record<JudgeType, number> = { PERFECT: 0, GREAT: 0, GOOD: 0, BAD: 0, MISS: 0 }
     for (const j of this.history) c[j]++
     return c
   }

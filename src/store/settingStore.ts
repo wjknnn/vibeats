@@ -23,7 +23,7 @@ type SettingState = {
 export const useSettingStore = create<SettingState>()(
   persist(
     (set) => ({
-      speed: 3,
+      speed: 6,
       setSpeed: (speed: number) => set({ speed }),
       keys: 4,
       setKeys: (keys: number) => set({ keys }),
@@ -42,6 +42,13 @@ export const useSettingStore = create<SettingState>()(
     }),
     {
       name: 'setting',
+      // 저장된 배속을 새 기본값(6)으로 1회 올려준다(더 높게 설정해둔 경우는 유지).
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = persisted as SettingState
+        if (version < 2 && state && state.speed < 6) state.speed = 6
+        return state
+      },
     },
   ),
 )
