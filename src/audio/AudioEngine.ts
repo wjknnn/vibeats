@@ -40,9 +40,26 @@ class AudioEngine {
   private pools = new Map<string, PoolEntry>()
   private bgmFilter: BiquadFilterNode | null = null
   private resumed = false
+  private previewLoops = new Map<string, () => void>()
+  private musicMaster: GainNode // 음악(bgm/song) 마스터 볼륨
+  private fxMaster: GainNode // 효과음(fx/pool/탭) 마스터 볼륨
 
   constructor() {
     this.ctx = new AudioContext()
+    this.musicMaster = this.ctx.createGain()
+    this.fxMaster = this.ctx.createGain()
+    this.musicMaster.connect(this.ctx.destination)
+    this.fxMaster.connect(this.ctx.destination)
+  }
+
+  /** 음악 마스터 볼륨 (0~100%) */
+  setMusicMasterVolume(pct: number) {
+    this.musicMaster.gain.value = Math.max(0, pct) / 100
+  }
+
+  /** 효과음 마스터 볼륨 (0~100%) */
+  setFxMasterVolume(pct: number) {
+    this.fxMaster.gain.value = Math.max(0, pct) / 100
   }
 
   get context() {
@@ -91,9 +108,19 @@ class AudioEngine {
       analyser.fftSize = 2048
       analyser.smoothingTimeConstant = 0
       gainNode.connect(analyser)
-      analyser.connect(this.ctx.destination)
+      analyser.connect(this.musicMaster)
     } else {
-      gainNode.connect(this.ctx.destination)
+      gainNode.connect(this.fxMaster)
+    }
+
+    // 같은 id의 기존 플레이어가 있으면 교체 전에 정지·해제 (재생 중 소스가 orphan 되어 안 멈추는 것 방지)
+    const prev = this.players.get(id)
+    if (prev) {
+      this.previewLoops.get(id)?.()
+      this.previewLoops.delete(id)
+      try { prev.source?.stop() } catch { /* already stopped */ }
+      prev.gainNode.disconnect()
+      prev.analyser?.disconnect()
     }
 
     this.players.set(id, {
@@ -192,7 +219,87 @@ class AudioEngine {
     }
   }
 
+  /**
+   * 하이라이트 구간 [startSec, endSec]를 매 사이클 페이드인/아웃하며 반복 재생.
+   * 곡 미리듣기용. stop(id)로 중단.
+   */
+  playHighlight(id: string, startSec: number, endSec: number, fadeSec = 0.8) {
+    const node = this.players.get(id)
+    if (!node) return
+    this.previewLoops.get(id)?.() // 이전 루프 취소
+    const len = Math.max(0.3, endSec - startSec)
+    const fade = Math.min(fadeSec, len / 2)
+    const target = node.gainNode.gain.value // 최초 볼륨 1회 캡처
+    const ctx = this.ctx
+    let stopped = false
+
+    const cycle = () => {
+      if (stopped) return
+      if (node.source) {
+        try { node.source.stop() } catch { /* already stopped */ }
+      }
+      const src = ctx.createBufferSource()
+      src.buffer = node.buffer
+      src.connect(node.gainNode)
+      const t0 = ctx.currentTime
+      const g = node.gainNode.gain
+      g.cancelScheduledValues(t0)
+      g.setValueAtTime(0, t0)
+      g.linearRampToValueAtTime(target, t0 + fade)
+      g.setValueAtTime(target, t0 + len - fade)
+      g.linearRampToValueAtTime(0, t0 + len)
+      src.start(t0, startSec, len) // duration만큼 재생 후 자동 종료
+      node.source = src
+      node.playing = true
+      src.onended = () => {
+        if (!stopped) cycle()
+      }
+    }
+    this.previewLoops.set(id, () => {
+      stopped = true
+    })
+    cycle()
+  }
+
+  /** 프리뷰를 페이드아웃 후 정지·제거 (곡 변경 시 뚝 끊기지 않게). */
+  fadeOutPreview(id: string, fadeSec = 0.5) {
+    this.previewLoops.get(id)?.() // 재트리거 루프 중단
+    this.previewLoops.delete(id)
+    const node = this.players.get(id)
+    if (!node) return
+    const now = this.ctx.currentTime
+    const g = node.gainNode.gain
+    try {
+      g.cancelScheduledValues(now)
+      g.setValueAtTime(g.value, now)
+      g.linearRampToValueAtTime(0, now + fadeSec)
+    } catch { /* noop */ }
+    try { node.source?.stop(now + fadeSec) } catch { /* already stopped */ }
+    node.playing = false
+    window.setTimeout(() => this.removePlayer(id), Math.ceil(fadeSec * 1000) + 60)
+  }
+
+  /** 노트 히트음 — 짧은 탭(에셋 없이 합성). gain은 선형(0~1). */
+  playTap(gain = 0.3) {
+    if (gain <= 0) return
+    const ctx = this.ctx
+    const osc = ctx.createOscillator()
+    const g = ctx.createGain()
+    osc.type = 'triangle'
+    osc.connect(g)
+    g.connect(this.fxMaster)
+    const t = ctx.currentTime
+    osc.frequency.setValueAtTime(1100, t)
+    osc.frequency.exponentialRampToValueAtTime(620, t + 0.06)
+    g.gain.setValueAtTime(gain, t)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07)
+    osc.start(t)
+    osc.stop(t + 0.09)
+  }
+
   stop(id: string) {
+    this.previewLoops.get(id)?.()
+    this.previewLoops.delete(id)
     const node = this.players.get(id)
     if (!node || !node.source) return
 
@@ -226,6 +333,8 @@ class AudioEngine {
   }
 
   removePlayer(id: string) {
+    this.previewLoops.get(id)?.()
+    this.previewLoops.delete(id)
     const node = this.players.get(id)
     if (!node) return
     try { node.source?.stop() } catch { /* already stopped */ }
@@ -255,7 +364,7 @@ class AudioEngine {
     const buffer = await this.loadBuffer(url)
     const gainNode = this.ctx.createGain()
     gainNode.gain.value = this.dbToGain(volume)
-    gainNode.connect(this.ctx.destination)
+    gainNode.connect(this.fxMaster)
 
     this.pools.set(key, { buffer, gainNode, players: [], volume })
   }
@@ -289,7 +398,7 @@ class AudioEngine {
       this.bgmFilter.type = 'lowpass'
       this.bgmFilter.frequency.value = 20000
       this.bgmFilter.Q.value = 1
-      this.bgmFilter.connect(this.ctx.destination)
+      this.bgmFilter.connect(this.musicMaster)
 
       this.players.forEach((node, key) => {
         if (key.startsWith('bgm_')) {

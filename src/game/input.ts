@@ -1,4 +1,4 @@
-import { KEY_BINDINGS } from './config'
+import { laneForKey } from './config'
 
 export type InputHandlers = {
   onLaneDown: (lane: number) => void
@@ -13,8 +13,6 @@ export type InputHandlers = {
  * 반환된 함수를 호출하면 detach 된다.
  */
 export function attachInput(keys: number, handlers: InputHandlers): () => void {
-  const keymap = KEY_BINDINGS[keys] ?? KEY_BINDINGS[4]
-
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.repeat) return // 키 리피트 무시 (홀드 판정 오염 방지)
 
@@ -23,14 +21,14 @@ export function attachInput(keys: number, handlers: InputHandlers): () => void {
       if (e.key === '-' || e.key === '_') return handlers.onSpeed(-0.1)
     }
 
-    const lane = keymap.indexOf(e.key)
+    const lane = laneForKey(keys, e.key)
     if (lane === -1) return
     e.preventDefault()
     handlers.onLaneDown(lane)
   }
 
   const onKeyUp = (e: KeyboardEvent) => {
-    const lane = keymap.indexOf(e.key)
+    const lane = laneForKey(keys, e.key)
     if (lane === -1) return
     handlers.onLaneUp(lane)
   }

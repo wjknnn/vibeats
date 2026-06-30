@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "title": "All I Need",
+    "artist": [
+      "jeonghyeon",
+      "SUNGYOO"
+    ],
+    "musicUrl": "/music/jeonghyeon _ SUNGYOO - All I Need.mp3",
+    "previewStart": 23000,
+    "previewEnd": 52500,
+    "volume": -10,
+    "offset": 0,
+    "bpm": 130,
+    "firstBeatMs": 990,
+    "charts": [
+      {
+        "keys": 4,
+        "difficulty": "NORMAL",
+        "level": 12,
+        "beatmapUrl": "/beatmap/1/4k_normal.json"
+      }
+    ],
+    "cover": "https://ncsmusic.s3.eu-west-1.amazonaws.com/tracks/000/001/925/100x100/all-i-need-1752105662-Wrikk0L6OX.jpg",
+    "license": "Song: Jeonghyeon & Sungyoo - All I Need\nMusic provided by NoCopyrightSounds\nFree Download/Stream: http://ncs.io/JS_AllINeed\nWatch: http://ncs.lnk.to/JS_AllINeedAT/youtube"
+  }
+]

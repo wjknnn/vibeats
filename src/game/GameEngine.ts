@@ -116,9 +116,10 @@ export class GameEngine {
     }
   }
 
-  pressLane(lane: number, timeMs: number) {
-    if (lane < 0 || lane >= this.keys) return
-    if (this.state.pressedLanes[lane]) return
+  /** @returns 이 입력으로 노트를 맞췄으면 true */
+  pressLane(lane: number, timeMs: number): boolean {
+    if (lane < 0 || lane >= this.keys) return false
+    if (this.state.pressedLanes[lane]) return false
     this.state.pressedLanes[lane] = true
 
     const result = this.track.tryJudge(lane, timeMs)
@@ -129,7 +130,9 @@ export class GameEngine {
       this.state.laneHitAt[lane] = timeMs
       this.state.laneHitType[lane] = result.type
       this.sync()
+      return true
     }
+    return false
   }
 
   releaseLane(lane: number, timeMs: number) {

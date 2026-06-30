@@ -27,11 +27,12 @@ export const useSettingStore = create<SettingState>()(
       setSpeed: (speed: number) => set({ speed }),
       keys: 4,
       setKeys: (keys: number) => set({ keys }),
-      musicVolume: -10,
+      // 볼륨: 0~100 퍼센트(선형). AudioEngine 마스터 게인에 적용.
+      musicVolume: 80,
       setMusicVolume: (volume: number) => set({ musicVolume: volume }),
-      effectVolume: -10,
+      effectVolume: 80,
       setEffectVolume: (volume: number) => set({ effectVolume: volume }),
-      songVolume: -10,
+      songVolume: 80,
       setSongVolume: (volume: number) => set({ songVolume: volume }),
       key4: ['d', 'f', 'j', 'k'],
       setKey4: (keys: string[]) => set({ key4: keys }),
@@ -42,11 +43,17 @@ export const useSettingStore = create<SettingState>()(
     }),
     {
       name: 'setting',
-      // 저장된 배속을 새 기본값(6)으로 1회 올려준다(더 높게 설정해둔 경우는 유지).
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         const state = persisted as SettingState
-        if (version < 2 && state && state.speed < 6) state.speed = 6
+        if (!state) return state
+        if (version < 2 && state.speed < 6) state.speed = 6
+        // v3: 볼륨을 dB → 퍼센트(0~100) 체계로 전환. 기존값은 기본값으로 리셋.
+        if (version < 3) {
+          state.musicVolume = 80
+          state.effectVolume = 80
+          state.songVolume = 80
+        }
         return state
       },
     },

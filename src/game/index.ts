@@ -16,6 +16,7 @@ export {
   calcApproachTime,
   getLaneColor,
   KEY_BINDINGS,
+  laneForKey,
   PLAYER_WIDTH,
   NOTE_HEIGHT,
   JUDGE_LINE_RATIO,

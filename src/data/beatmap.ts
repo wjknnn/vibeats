@@ -4,11 +4,8 @@
 
 export type BeatmapEntry = [number, number, number]
 
+// 비트맵은 노트(map)만 담는다. 타이밍(bpm/offset/firstBeatMs)은 곡 단위라 SongData에서 관리.
 export type RawBeatmap = {
-  // 타이밍 정보(에디터로 수정·저장 가능). 없으면 SongData 값으로 폴백.
-  bpm?: number
-  offset?: number
-  firstBeatMs?: number
   map: BeatmapEntry[]
 }
 

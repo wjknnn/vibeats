@@ -12,11 +12,20 @@ export const NOTE_HEIGHT = 32
 /** 판정선 위치 — 화면 높이 대비 비율(위에서부터). 0.82 = 아래쪽 */
 export const JUDGE_LINE_RATIO = 0.82
 
-/** 키 매핑 (4/5/6키) */
-export const KEY_BINDINGS: Record<number, string[]> = {
-  4: ['d', 'f', 'j', 'k'],
-  5: ['d', 'f', ' ', 'j', 'k'],
-  6: ['s', 'd', 'f', 'j', 'k', 'l'],
+/**
+ * 키 매핑 (4/5/6키). 레인마다 여러 키 허용.
+ * 5키 가운데(레인 2)는 f/j 둘 다 받는다.
+ */
+export const KEY_BINDINGS: Record<number, string[][]> = {
+  4: [['d'], ['f'], ['j'], ['k']],
+  5: [['s'], ['d'], ['f', 'j'], ['k'], ['l']],
+  6: [['s'], ['d'], ['f'], ['j'], ['k'], ['l']],
+}
+
+/** 눌린 키가 어느 레인인지. 없으면 -1. */
+export function laneForKey(keys: number, key: string): number {
+  const binding = KEY_BINDINGS[keys] ?? KEY_BINDINGS[4]
+  return binding.findIndex((laneKeys) => laneKeys.includes(key))
 }
 
 /**

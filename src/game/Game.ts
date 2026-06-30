@@ -19,8 +19,11 @@ type Phase = 'loading' | 'playing' | 'paused' | 'countdown' | 'finished'
 
 export type GameOptions = {
   song: SongData
+  beatmapUrl: string
   speed: number
   keys?: number
+  /** 노트 히트음 볼륨(선형 0~1). 0이면 무음 */
+  hitVolume?: number
   onComplete?: (result: GameResult) => void
   onSpeedChange?: (speed: number) => void
   /** 재시작 요청 (보통 GamePage가 Game 인스턴스를 재생성) */
@@ -44,6 +47,7 @@ export class Game {
 
   private keys = DEFAULT_KEYS
   private speed = 3
+  private hitVolume = 0.3
   private approachMs = 0
   private songId = ''
   private opts!: GameOptions
@@ -62,6 +66,7 @@ export class Game {
     this.opts = opts
     this.keys = opts.keys ?? DEFAULT_KEYS
     this.speed = opts.speed
+    this.hitVolume = opts.hitVolume ?? 0.3
     this.approachMs = calcApproachTime(opts.speed)
 
     // 1) Pixi 초기화 (비동기). 도중에 언마운트(StrictMode)되면 중단.
@@ -83,7 +88,7 @@ export class Game {
     await audioEngine.resume() // 사용자 제스처 후 호출되었다는 가정. suspended면 깨움.
     this.songId = `song_${opts.song.id}`
     const [raw] = await Promise.all([
-      loadBeatmap(opts.song.beatmapUrl),
+      loadBeatmap(opts.beatmapUrl),
       audioEngine.addPlayer('song', String(opts.song.id), opts.song.musicUrl, {
         volume: opts.song.volume,
       }),
@@ -91,9 +96,9 @@ export class Game {
     if (this.destroyed) return
 
     // 타이밍: 비트맵 JSON에 있으면 우선, 없으면 SongData 폴백 (에디터 저장값 반영)
-    const bpm = raw.bpm ?? opts.song.bpm
-    const firstBeatMs = raw.firstBeatMs ?? opts.song.firstBeatMs ?? 0
-    const songOffsetMs = raw.offset ?? opts.song.offset ?? 0
+    const bpm = opts.song.bpm
+    const firstBeatMs = opts.song.firstBeatMs ?? 0
+    const songOffsetMs = opts.song.offset ?? 0
 
     // 3) 엔진/렌더러/입력 구성
     this.engine = new GameEngine(this.keys)
@@ -105,7 +110,9 @@ export class Game {
     this.detachInput = attachInput(this.keys, {
       // 플레이 중에만 레인 입력을 엔진에 전달 (일시정지/카운트다운 중엔 무시)
       onLaneDown: (lane) => {
-        if (this.phase === 'playing') this.engine?.pressLane(lane, this.conductor!.timeMs)
+        if (this.phase !== 'playing') return
+        const hit = this.engine?.pressLane(lane, this.conductor!.timeMs)
+        if (hit) audioEngine.playTap(this.hitVolume)
       },
       onLaneUp: (lane) => {
         if (this.phase === 'playing') this.engine?.releaseLane(lane, this.conductor!.timeMs)

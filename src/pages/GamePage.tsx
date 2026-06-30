@@ -11,8 +11,9 @@ import { getSongById } from '@/data/songs'
 export default function GamePage() {
   const navigate = useNavigate()
   const speed = useSettingStore((s) => s.speed)
-  const keys = useSettingStore((s) => s.keys)
   const selectedMusicId = useCommonStore((s) => s.selectedMusicId)
+  const selectedKeys = useCommonStore((s) => s.selectedKeys)
+  const selectedDifficulty = useCommonStore((s) => s.selectedDifficulty)
   const containerRef = useRef<HTMLDivElement>(null)
   // runId가 바뀌면 effect가 재실행 → Game 인스턴스 재생성 = 인앱 재시작(페이지 리로드 X)
   const [runId, setRunId] = useState(0)
@@ -20,7 +21,8 @@ export default function GamePage() {
   useEffect(() => {
     const container = containerRef.current
     const song = getSongById(selectedMusicId ?? 1)
-    if (!container || !song || !song.beatmapUrl) {
+    const chart = song?.charts.find((c) => c.keys === selectedKeys && c.difficulty === selectedDifficulty)
+    if (!container || !song || !chart) {
       navigate('/music-list', { replace: true })
       return
     }
@@ -28,8 +30,11 @@ export default function GamePage() {
     const game = new Game()
     game.start(container, {
       song,
+      beatmapUrl: chart.beatmapUrl,
       speed,
-      keys,
+      keys: chart.keys,
+      hitVolume: 0.4, // 효과음 마스터(설정)가 전체 볼륨을 제어
+
       onComplete: (result) => {
         navigate('/result', { replace: true, state: result })
       },
